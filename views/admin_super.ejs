@@ -1,170 +1,658 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
+
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>总管理台 - 系统设置</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
   <style>
-    body { font-family: 'Segoe UI', sans-serif; background: #f4f6f9; margin: 0; padding: 20px; color: #333; }
-    .container { max-width: 900px; margin: 0 auto; }
-    .header { display: flex; justify-content: space-between; align-items: center; background: white; padding: 15px 25px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); margin-bottom: 20px; }
-    .card { background: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); margin-bottom: 20px; }
-    h3 { margin-top: 0; color: #2c3e50; }
-    .btn { background: #3498db; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; text-decoration: none; display: inline-block; }
-    .btn:hover { background: #2980b9; }
-    .btn-danger { background: #e74c3c; }
-    .btn-danger:hover { background: #c0392b; }
-    input[type="text"], input[type="password"], textarea, select { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; margin-bottom: 10px; }
-    textarea { height: 120px; font-family: monospace; }
-    table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 14px; }
-    table th, table td { border: 1px solid #ddd; padding: 10px; text-align: left; }
-    table th { background-color: #f9f9f9; }
+    :root {
+      --primary-color: #4f46e5;
+      --primary-hover: #4338ca;
+      --bg-color: #f8fafc;
+      --sidebar-color: #1e293b;
+      --card-bg: #ffffff;
+      --text-main: #1e293b;
+      --text-muted: #64748b;
+      --border-color: #e2e8f0;
+    }
+
+    body {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      background: var(--bg-color);
+      margin: 0;
+      color: var(--text-main);
+      display: flex;
+      min-height: 100vh;
+    }
+
+    /* Sidebar */
+    .sidebar {
+      width: 260px;
+      background: var(--sidebar-color);
+      color: white;
+      display: flex;
+      flex-direction: column;
+      position: fixed;
+      height: 100vh;
+      z-index: 100;
+    }
+
+    .sidebar-header {
+      padding: 24px;
+      font-size: 1.25rem;
+      font-weight: 700;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .sidebar-nav {
+      flex: 1;
+      padding: 20px 0;
+    }
+
+    .nav-item {
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      color: #cbd5e1;
+      text-decoration: none;
+      transition: all 0.2s;
+      cursor: pointer;
+    }
+
+    .nav-item:hover {
+      background: rgba(255, 255, 255, 0.05);
+      color: white;
+    }
+
+    .nav-item.active {
+      background: var(--primary-color);
+      color: white;
+    }
+
+    .sidebar-footer {
+      padding: 20px;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    /* Main Content */
+    .main-content {
+      flex: 1;
+      margin-left: 260px;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+
+    .top-bar {
+      height: 64px;
+      background: white;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 32px;
+      position: sticky;
+      top: 0;
+      z-index: 90;
+    }
+
+    .page-container {
+      padding: 32px;
+      max-width: 1200px;
+      margin: 0 auto;
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    /* Cards & Components */
+    .card {
+      background: var(--card-bg);
+      border-radius: 12px;
+      border: 1px solid var(--border-color);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+      margin-bottom: 24px;
+      overflow: hidden;
+    }
+
+    .card-header {
+      padding: 20px 24px;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .card-header h3 {
+      margin: 0;
+      font-size: 1.1rem;
+      color: var(--text-main);
+    }
+
+    .card-body {
+      padding: 24px;
+    }
+
+    .btn {
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+      border: none;
+      font-size: 0.875rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .btn-primary {
+      background: var(--primary-color);
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background: var(--primary-hover);
+    }
+
+    .btn-danger {
+      background: #ef4444;
+      color: white;
+    }
+
+    .btn-danger:hover {
+      background: #dc2626;
+    }
+
+    .btn-outline {
+      background: white;
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+    }
+
+    .btn-outline:hover {
+      background: var(--bg-color);
+    }
+
+    input,
+    select,
+    textarea {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      font-size: 0.875rem;
+      background: white;
+      margin-bottom: 12px;
+    }
+
+    textarea {
+      height: 120px;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    th {
+      text-align: left;
+      padding: 12px 16px;
+      background: var(--bg-color);
+      font-weight: 600;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    td {
+      padding: 16px;
+      border-bottom: 1px solid var(--border-color);
+      font-size: 0.875rem;
+    }
+
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    .badge {
+      padding: 4px 8px;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 500;
+    }
+
+    .badge-blue {
+      background: #dbeafe;
+      color: #1e40af;
+    }
+
+    .badge-green {
+      background: #dcfce7;
+      color: #166534;
+    }
+
+    .badge-gray {
+      background: #f1f5f9;
+      color: #475569;
+    }
+
+    /* Tab Sections */
+    .tab-content {
+      display: none;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    .outline-tree {
+      list-style: none;
+      padding: 0;
+    }
+
+    .outline-item {
+      margin-bottom: 10px;
+    }
+
+    .outline-l1 {
+      font-weight: 600;
+      color: var(--primary-color);
+      margin-top: 20px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .outline-l2 {
+      padding-left: 28px;
+      color: var(--text-muted);
+      font-size: 0.875rem;
+      border-left: 2px solid var(--border-color);
+      margin-left: 10px;
+      padding-top: 4px;
+      padding-bottom: 4px;
+    }
   </style>
 </head>
+
 <body>
-  <div class="container">
-    <div class="header">
-      <h2>👑 总管理台</h2>
-      <div>
-        <a href="/logout" class="btn btn-danger">退出登录</a>
+
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <i class="fas fa-shield-halved"></i>
+      <span>总管理台</span>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-item active" onclick="switchTab('dashboard', this)">
+        <i class="fas fa-chart-line"></i> 仪表盘预览
       </div>
+      <div class="nav-item" onclick="switchTab('outlines', this)">
+        <i class="fas fa-sitemap"></i> 文档大纲审阅
+      </div>
+      <div class="nav-item" onclick="switchTab('uploads', this)">
+        <i class="fas fa-file-export"></i> 用户数据与文件
+      </div>
+      <div class="nav-item" onclick="switchTab('users', this)">
+        <i class="fas fa-users-cog"></i> 账号与部门
+      </div>
+      <div class="nav-item" onclick="switchTab('settings', this)">
+        <i class="fas fa-cog"></i> 系统配置
+      </div>
+    </nav>
+    <div class="sidebar-footer">
+      <a href="/logout" class="btn btn-danger w-full" style="width: 80%; justify-content: center;">
+        <i class="fas fa-sign-out-alt"></i> 退出登录
+      </a>
     </div>
+  </aside>
 
-    <!-- API Key Settings -->
-    <div class="card" style="border-top: 4px solid #3498db;">
-      <h3>🔑 API Key 配置</h3>
-      <form action="/admin/settings" method="POST">
-        <label style="display:block; margin-bottom: 5px;">DeepSeek API Key</label>
-        <div style="display: flex; gap: 10px;">
-          <input type="text" name="apiKey" value="<%= apiKey %>" placeholder="输入 DeepSeek API Key">
-          <button type="submit" class="btn">保存</button>
-        </div>
-      </form>
-    </div>
+  <main class="main-content">
+    <header class="top-bar">
+      <div style="font-weight: 600; color: var(--text-muted);">
+        系统状态: <span style="color: #10b981;">● 在线</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span style="font-size: 0.875rem; font-weight: 500;">
+          <%= departmentName %> (admin)
+        </span>
+        <div
+          style="width: 32px; height: 32px; background: var(--primary-color); border-radius: 50%; color: white; display: flex; align-items: center; justify-content: center; font-size: 0.75rem;">
+          AD</div>
+      </div>
+    </header>
 
-    <!-- Initialize Outline -->
-    <div class="card" style="border-top: 4px solid #9b59b6;">
-      <h3>📝 初始化文档大纲</h3>
-      <form action="/admin/init-outline" method="POST" onsubmit="return confirm('警告：这将重置并覆盖指定部门的当前大纲结构！确定吗？')">
-        <label style="display:block; margin-bottom: 5px;">选择部门</label>
-        <select name="targetDept">
-          <% users.forEach(u => { %>
-            <option value="<%= u.department %>"><%= u.department_name %></option>
-          <% }) %>
-        </select>
-        <label style="display:block; margin-bottom: 5px; margin-top: 10px;">输入大纲内容 (层级示例：一、某章节 1.某小节)</label>
-        <textarea name="outline" placeholder="例如：
-一、某章节
-1.某小节
-2.某小节
-二、某章节
-1.某小节"></textarea>
-        <button type="submit" class="btn" style="background:#9b59b6;">生成并重置大纲</button>
-      </form>
-    </div>
+    <div class="page-container">
 
-    <!-- Version History -->
-    <div class="card" style="border-top: 4px solid #f39c12;">
-      <h3>⏳ 全局文档版本管理 (历史快照)</h3>
-      <p style="color: #666; font-size: 13px;">包含所有部门每次 AI 更新后的全量快照。</p>
-      <ul>
-        <% if (versions && versions.length > 0) { %>
-          <% versions.forEach(v => { %>
-            <li style="margin-bottom: 8px;">
-              <span style="display:inline-block; width: 60px; color: #888;">[<%= v.department === 'engineering' ? '工程部' : '设计部' %>]</span>
-              <a href="/doc/<%= v.department %>?vid=<%= v.id %>" target="_blank" style="color: #2980b9; text-decoration: none;">📄 预览 <%= v.timestamp %> 版本</a>
-            </li>
-          <% }) %>
-        <% } else { %>
-          <li style="color: #999;">暂无历史记录</li>
-        <% } %>
-      </ul>
-    </div>
-    <!-- Account Management -->
-    <div class="card" style="border-top: 4px solid #27ae60;">
-      <h3>👥 账号与部门管理</h3>
-      <table>
-        <thead>
-          <tr>
-            <th>账号ID</th>
-            <th>用户名</th>
-            <th>部门标识</th>
-            <th>部门名称</th>
-            <th>操作</th>
-          </tr>
-        </thead>
-        <tbody>
-          <% users.forEach(u => { %>
-            <tr>
-              <td><%= u.id %></td>
-              <td><%= u.username %></td>
-              <td><%= u.department %></td>
-              <td><%= u.department_name %></td>
-              <td>
-                <form action="/admin/users/delete" method="POST" style="display:inline;" onsubmit="return confirm('确定要删除此账号吗？')">
-                  <input type="hidden" name="id" value="<%= u.id %>">
-                  <button type="submit" class="btn btn-danger" style="padding: 4px 8px; font-size: 12px;">删除</button>
-                </form>
-              </td>
-            </tr>
-          <% }) %>
-        </tbody>
-      </table>
+      <!-- Tab: Dashboard -->
+      <section id="dashboard" class="tab-content active">
+        <div
+          style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 24px; margin-bottom: 32px;">
+          <div class="card" style="margin-bottom: 0;">
+            <div class="card-body">
+              <div style="color: var(--text-muted); font-size: 0.875rem; margin-bottom: 8px;">总活跃账号</div>
+              <div style="font-size: 1.5rem; font-weight: 700;">
+                <%= users.length %>
+              </div>
+            </div>
+          </div>
+          <div class="card" style="margin-bottom: 0;">
+            <div class="card-body">
+              <div style="color: var(--text-muted); font-size: 0.875rem; margin-bottom: 8px;">最近上传文件</div>
+              <div style="font-size: 1.5rem; font-weight: 700;">
+                <%= uploads.length %>
+              </div>
+            </div>
+          </div>
+          <div class="card" style="margin-bottom: 0;">
+            <div class="card-body">
+              <div style="color: var(--text-muted); font-size: 0.875rem; margin-bottom: 8px;">快照版本数</div>
+              <div style="font-size: 1.5rem; font-weight: 700;">
+                <%= versions.length %>
+              </div>
+            </div>
+          </div>
+        </div>
 
-      <h4 style="margin-top: 20px;">添加新部门/账号</h4>
-      <form action="/admin/users" method="POST" style="display:flex; gap:10px; flex-wrap:wrap; align-items: flex-end;">
-        <div style="flex: 1; min-width: 150px;">
-          <label style="font-size: 13px;">用户名(登录用)</label>
-          <input type="text" name="username" required>
-        </div>
-        <div style="flex: 1; min-width: 150px;">
-          <label style="font-size: 13px;">密码</label>
-          <input type="text" name="password" required>
-        </div>
-        <div style="flex: 1; min-width: 150px;">
-          <label style="font-size: 13px;">部门标识(英文字母)</label>
-          <input type="text" name="department" placeholder="例如: hr" required>
-        </div>
-        <div style="flex: 1; min-width: 150px;">
-          <label style="font-size: 13px;">部门名称(展示用)</label>
-          <input type="text" name="department_name" placeholder="例如: 人事部" required>
-        </div>
-        <button type="submit" class="btn" style="background: #27ae60; margin-bottom: 10px;">添加</button>
-      </form>
-    </div>
-
-    <!-- Activity Logs -->
-    <div class="card" style="border-top: 4px solid #34495e;">
-      <h3>📋 全局操作日志</h3>
-      <p style="color: #666; font-size: 13px;">展示各账号添加内容的记录。</p>
-      <div style="max-height: 400px; overflow-y: auto;">
-        <table>
-          <thead>
-            <tr>
-              <th>时间</th>
-              <th>账号</th>
-              <th>部门</th>
-              <th>操作</th>
-              <th>详情</th>
-            </tr>
-          </thead>
-          <tbody>
-            <% if (logs && logs.length > 0) { %>
-              <% logs.forEach(log => { %>
+        <div class="card">
+          <div class="card-header">
+            <h3>📋 全局最近操作日志</h3>
+          </div>
+          <div class="card-body" style="padding: 0;">
+            <table>
+              <thead>
                 <tr>
-                  <td style="font-size:12px; color:#666;"><%= log.created_at %></td>
-                  <td><%= log.username %></td>
-                  <td><%= log.department %></td>
-                  <td><%= log.action %></td>
-                  <td style="font-size:13px;"><%= log.details %></td>
+                  <th>时间</th>
+                  <th>账号</th>
+                  <th>动作</th>
+                  <th>详情</th>
                 </tr>
-              <% }) %>
-            <% } else { %>
-              <tr><td colspan="5" style="text-align:center; color:#999;">暂无操作日志</td></tr>
-            <% } %>
-          </tbody>
-        </table>
-      </div>
+              </thead>
+              <tbody>
+                <% logs.forEach(log=> { %>
+                  <tr>
+                    <td style="white-space: nowrap; color: var(--text-muted);">
+                      <%= log.created_at.substring(5, 16) %>
+                    </td>
+                    <td><span class="badge badge-gray">
+                        <%= log.username %>
+                      </span></td>
+                    <td><span class="badge badge-blue">
+                        <%= log.action %>
+                      </span></td>
+                    <td>
+                      <%= log.details %>
+                    </td>
+                  </tr>
+                  <% }) %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- Tab: Outlines -->
+      <section id="outlines" class="tab-content">
+        <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 24px;">
+          <div class="card">
+            <div class="card-header">
+              <h3>⚡ 快速初始化/重置</h3>
+            </div>
+            <div class="card-body">
+              <form action="/admin/init-outline" method="POST" onsubmit="return confirm('警告：这将重置大纲结构！确定吗？')">
+                <label>选择部门</label>
+                <select name="targetDept" id="targetDeptSelect" onchange="updateOutlineTemplate()">
+                  <% users.forEach(u=> { %>
+                    <option value="<%= u.department %>">
+                      <%= u.department_name %>
+                    </option>
+                    <% }) %>
+                </select>
+                <label>模板内容</label>
+                <textarea name="outline" id="outlineTextarea"></textarea>
+                <button type="submit" class="btn btn-primary w-full"
+                  style="width: 100%; justify-content: center;">保存并应用结构</button>
+              </form>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <h3>🏢 全局文档大纲预览</h3>
+            </div>
+            <div class="card-body">
+              <% const deptGroups={}; allMaterials.forEach(m=> {
+                if(!deptGroups[m.department]) deptGroups[m.department] = [];
+                deptGroups[m.department].push(m);
+                });
+                %>
+                <% Object.keys(deptGroups).forEach(deptKey=> { %>
+                  <div
+                    style="margin-bottom: 30px; padding: 20px; background: #fafafa; border-radius: 8px; border: 1px solid #eee;">
+                    <h4 style="margin: 0 0 15px 0; display: flex; align-items: center; gap: 8px;">
+                      <i class="fas fa-folder-open" style="color: #f59e0b;"></i>
+                      <%= users.find(u=> u.department === deptKey)?.department_name || deptKey %>
+                    </h4>
+                    <ul class="outline-tree">
+                      <% const items=deptGroups[deptKey]; const level1=items.filter(i=> i.level === 1);
+                        level1.forEach(l1 => {
+                        %>
+                        <li class="outline-item">
+                          <div class="outline-l1"><i class="fas fa-chevron-right" style="font-size: 10px;"></i>
+                            <%= l1.title %>
+                          </div>
+                          <% const level2=items.filter(i=> i.parent_id === l1.id);
+                            level2.forEach(l2 => {
+                            %>
+                            <div class="outline-l2">
+                              <%= l2.title %>
+                            </div>
+                            <% }) %>
+                        </li>
+                        <% }) %>
+                    </ul>
+                  </div>
+                  <% }) %>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Tab: Uploads -->
+      <section id="uploads" class="tab-content">
+        <div class="card">
+          <div class="card-header">
+            <h3>文件与上传内容审计</h3>
+          </div>
+          <div class="card-body" style="padding: 0;">
+            <table>
+              <thead>
+                <tr>
+                  <th>文件名</th>
+                  <th>类型</th>
+                  <th>上传者</th>
+                  <th>部门</th>
+                  <th>时间</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% uploads.forEach(file=> { %>
+                  <tr>
+                    <td style="font-weight: 500;">
+                      <%= file.original_name %>
+                    </td>
+                    <td><span class="badge badge-gray">
+                        <%= file.file_type %>
+                      </span></td>
+                    <td>
+                      <%= file.username %>
+                    </td>
+                    <td>
+                      <%= file.department %>
+                    </td>
+                    <td style="color: var(--text-muted);">
+                      <%= file.created_at %>
+                    </td>
+                    <td>
+                      <a href="<%= file.file_path %>" target="_blank" class="btn btn-outline" style="padding: 4px 8px;">
+                        <i class="fas fa-eye"></i> 查看
+                      </a>
+                    </td>
+                  </tr>
+                  <% }) %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- Tab: Users -->
+      <section id="users" class="tab-content">
+        <div class="card">
+          <div class="card-header">
+            <h3>👥 账号与部门管理</h3>
+            <button class="btn btn-primary" onclick="document.getElementById('addUserForm').style.display='block'">
+              <i class="fas fa-plus"></i> 新增部门
+            </button>
+          </div>
+          <div class="card-body" style="padding: 0;">
+            <div id="addUserForm"
+              style="display: none; padding: 24px; background: var(--bg-color); border-bottom: 1px solid var(--border-color);">
+              <form action="/admin/users" method="POST"
+                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+                <div><label>用户名</label><input type="text" name="username" required></div>
+                <div><label>密码</label><input type="text" name="password" required></div>
+                <div><label>部门标识(英)</label><input type="text" name="department" placeholder="hr" required></div>
+                <div><label>部门名称</label><input type="text" name="department_name" placeholder="人事部" required></div>
+                <div style="grid-column: span 2; display: flex; gap: 10px;">
+                  <button type="submit" class="btn btn-primary">提交</button>
+                  <button type="button" class="btn btn-outline"
+                    onclick="this.parentElement.parentElement.parentElement.style.display='none'">取消</button>
+                </div>
+              </form>
+            </div>
+            <table>
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>用户名</th>
+                  <th>部门标识</th>
+                  <th>部门名称</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% users.forEach(u=> { %>
+                  <tr>
+                    <td>#<%= u.id %>
+                    </td>
+                    <td style="font-weight: 500;">
+                      <%= u.username %>
+                    </td>
+                    <td><code><%= u.department %></code></td>
+                    <td>
+                      <%= u.department_name %>
+                    </td>
+                    <td>
+                      <form action="/admin/users/delete" method="POST" style="display:inline;"
+                        onsubmit="return confirm('确定删除？')">
+                        <input type="hidden" name="id" value="<%= u.id %>">
+                        <button type="submit" class="btn btn-danger" style="padding: 4px 8px;"><i
+                            class="fas fa-trash"></i></button>
+                      </form>
+                    </td>
+                  </tr>
+                  <% }) %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- Tab: Settings -->
+      <section id="settings" class="tab-content">
+        <div class="card">
+          <div class="card-header">
+            <h3>⚙️ 系统核心设置</h3>
+          </div>
+          <div class="card-body">
+            <form action="/admin/settings" method="POST">
+              <div style="margin-bottom: 20px;">
+                <label style="display: block; font-weight: 600; margin-bottom: 8px;">DeepSeek API Key</label>
+                <input type="password" name="apiKey" value="<%= apiKey %>" style="width: 100%; max-width: 500px;"
+                  placeholder="sk-...">
+                <p style="font-size: 12px; color: var(--text-muted); margin-top: 5px;">用于驱动文档智能解析与 AIGC 内容生成。</p>
+              </div>
+              <button type="submit" class="btn btn-primary">保存配置</button>
+            </form>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h3>⏳ 历史快照管理</h3>
+          </div>
+          <div class="card-body">
+            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 15px;">
+              <% versions.forEach(v=> { %>
+                <div
+                  style="padding: 15px; border: 1px solid var(--border-color); border-radius: 8px; display: flex; justify-content: space-between; align-items: center;">
+                  <div>
+                    <div style="font-weight: 600; font-size: 0.875rem;">
+                      <%= users.find(u=> u.department === v.department)?.department_name || v.department %>
+                    </div>
+                    <div style="font-size: 0.75rem; color: var(--text-muted);">
+                      <%= v.timestamp %>
+                    </div>
+                  </div>
+                  <a href="/doc/<%= v.department %>?vid=<%= v.id %>" target="_blank" class="btn btn-outline"
+                    style="padding: 4px 10px;">预览</a>
+                </div>
+                <% }) %>
+            </div>
+          </div>
+        </div>
+      </section>
+
     </div>
-  </div>
+  </main>
+
+  <script>
+    function switchTab(tabId, el) {
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+
+      document.getElementById(tabId).classList.add('active');
+      el.classList.add('active');
+
+      if (tabId === 'outlines') updateOutlineTemplate();
+    }
+
+    const deptTemplates = <%- JSON.stringify(locals.templates || {}) %>;
+    function updateOutlineTemplate() {
+      const select = document.getElementById('targetDeptSelect');
+      const textarea = document.getElementById('outlineTextarea');
+      if (!select || !textarea) return;
+      const selectedDept = select.value;
+      textarea.value = deptTemplates[selectedDept] || "";
+    }
+
+    window.onload = () => {
+      if (window.location.hash) {
+        const h = window.location.hash.substring(1);
+        const target = document.querySelector(`.nav-item[onclick*="${h}"]`);
+        if (target) target.click();
+      }
+    };
+  </script>
 </body>
+
 </html>

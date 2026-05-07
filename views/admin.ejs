@@ -1,61 +1,204 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>资料管理后台</title>
   <!-- 引入 WangEditor 作为无API Key依赖的富文本编辑器 -->
   <link href="https://unpkg.com/@wangeditor/editor@latest/dist/css/style.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
   <style>
-    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; margin: 0; padding: 0; }
-    .header { background-color: #2c3e50; color: white; padding: 15px; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; }
-    .header h2 { margin: 0; font-size: 1.2rem; }
-    .header-links { margin-top: 10px; display: flex; gap: 10px; }
-    .header a { color: #ecf0f1; text-decoration: none; padding: 5px 10px; background: #34495e; border-radius: 4px; font-size: 14px; }
-    .header a:hover { background: #465c71; }
-    .container { max-width: 1000px; margin: 20px auto; padding: 0 15px; }
-    .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); margin-bottom: 20px; overflow-x: auto; }
-    .card h3 { margin-top: 0; border-bottom: 1px solid #eee; padding-bottom: 10px; font-size: 1.1rem; }
-    .form-group { margin-bottom: 15px; }
-    .form-group label { display: block; margin-bottom: 8px; font-weight: bold; font-size: 14px; }
-    .form-group input[type="text"], .form-group input[type="password"], .form-group textarea { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; font-family: inherit; }
-    .btn { background: #2ecc71; color: white; border: none; padding: 10px 15px; font-size: 14px; border-radius: 4px; cursor: pointer; display: inline-block; }
-    .btn:hover { background: #27ae60; }
-    table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 14px; min-width: 600px; }
-    table th, table td { border: 1px solid #ddd; padding: 10px; text-align: left; vertical-align: top; }
-    table th { background-color: #f9f9f9; }
-    .btn-delete { background: #e74c3c; color: white; padding: 5px 10px; text-decoration: none; border-radius: 3px; font-size: 12px; }
-    .btn-delete:hover { background: #c0392b; }
-    .reset-btn { background: #e74c3c; float: right; margin-top: -5px; }
-    .level-1 { font-weight: bold; color: #2c3e50; font-size: 16px; }
-    .level-2 { padding-left: 20px; color: #34495e; }
-    @media (min-width: 768px) { .header-links { margin-top: 0; } }
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #f4f7f6;
+      margin: 0;
+      padding: 0;
+    }
+
+    .header {
+      background-color: #2c3e50;
+      color: white;
+      padding: 15px;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .header h2 {
+      margin: 0;
+      font-size: 1.2rem;
+    }
+
+    .header-links {
+      margin-top: 10px;
+      display: flex;
+      gap: 10px;
+    }
+
+    .header a {
+      color: #ecf0f1;
+      text-decoration: none;
+      padding: 5px 10px;
+      background: #34495e;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+
+    .header a:hover {
+      background: #465c71;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 20px auto;
+      padding: 0 15px;
+    }
+
+    .card {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+      margin-bottom: 20px;
+      overflow-x: auto;
+    }
+
+    .card h3 {
+      margin-top: 0;
+      border-bottom: 1px solid #eee;
+      padding-bottom: 10px;
+      font-size: 1.1rem;
+    }
+
+    .form-group {
+      margin-bottom: 15px;
+    }
+
+    .form-group label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: bold;
+      font-size: 14px;
+    }
+
+    .form-group input[type="text"],
+    .form-group input[type="password"],
+    .form-group textarea {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      box-sizing: border-box;
+      font-family: inherit;
+    }
+
+    .btn {
+      background: #2ecc71;
+      color: white;
+      border: none;
+      padding: 10px 15px;
+      font-size: 14px;
+      border-radius: 4px;
+      cursor: pointer;
+      display: inline-block;
+    }
+
+    .btn:hover {
+      background: #27ae60;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 15px;
+      font-size: 14px;
+      min-width: 600px;
+    }
+
+    table th,
+    table td {
+      border: 1px solid #ddd;
+      padding: 10px;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    table th {
+      background-color: #f9f9f9;
+    }
+
+    .btn-delete {
+      background: #e74c3c;
+      color: white;
+      padding: 5px 10px;
+      text-decoration: none;
+      border-radius: 3px;
+      font-size: 12px;
+    }
+
+    .btn-delete:hover {
+      background: #c0392b;
+    }
+
+    .reset-btn {
+      background: #e74c3c;
+      float: right;
+      margin-top: -5px;
+    }
+
+    .level-1 {
+      font-weight: bold;
+      color: #2c3e50;
+      font-size: 16px;
+    }
+
+    .level-2 {
+      padding-left: 20px;
+      color: #34495e;
+    }
+
+    @media (min-width: 768px) {
+      .header-links {
+        margin-top: 0;
+      }
+    }
   </style>
 </head>
+
 <body>
 
   <div class="header">
-    <h2>管理后台 - <%= departmentName %></h2>
+    <h2>管理后台 - <%= departmentName %>
+    </h2>
     <div class="header-links">
+      <a href="/doc/<%= department %>" target="_blank" style="background: #3498db;"><i class="fas fa-eye"></i>
+        查看前台文档</a>
       <a href="/logout">退出登录</a>
     </div>
   </div>
 
   <div class="container">
-    
-  <div class="container">
-      
+
+    <div class="container">
+
       <!-- AI 补充资料处使用富文本编辑器 -->
       <div class="card" style="border-top: 4px solid #8e44ad;">
         <h3 style="color: #8e44ad;">✨ 智能补充资料 / 新增内容 (使用富文本编辑)</h3>
-        <p style="color: #666; font-size: 13px;">在这里利用富文本编辑器编写内容、插入视频和图片。点击发送后，系统将这部分富文本发送给AI归类到大纲，并自动归档保存为 <code>.md</code> 文件。</p>
-        
+        <p style="color: #666; font-size: 13px;">在这里利用富文本编辑器编写内容、插入视频和图片。点击发送后，系统将这部分富文本发送给AI归类到大纲，并自动归档保存为
+          <code>.md</code> 文件。
+        </p>
+
         <!-- 智能文档解析器 -->
-        <div style="margin-bottom: 15px; padding: 15px; background: #ecf0f1; border-radius: 4px; border-left: 4px solid #3498db;">
+        <div
+          style="margin-bottom: 15px; padding: 15px; background: #ecf0f1; border-radius: 4px; border-left: 4px solid #3498db;">
           <h4 style="margin: 0 0 10px 0; color: #2c3e50;">📥 智能文档解析导入</h4>
-          <p style="font-size: 12px; color: #7f8c8d; margin-top: 0;">支持 .doc, .docx, .pdf, .xls, .xlsx, .txt, .md。选中文件后自动提取文字并加载到下方编辑器中，方便您修改后再提交给AI处理。</p>
+          <p style="font-size: 12px; color: #7f8c8d; margin-top: 0;">支持 .doc, .docx, .pdf, .xls, .xlsx, .txt,
+            .md。选中文件后自动提取文字并加载到下方编辑器中，方便您修改后再提交给AI处理。</p>
           <input type="file" id="document-upload" accept=".doc,.docx,.pdf,.xls,.xlsx,.txt,.md" style="font-size: 13px;">
-          <span id="parse-status" style="font-size: 13px; color: #e67e22; margin-left: 10px; display: none;">正在解析文档内容，请稍候...</span>
+          <span id="parse-status"
+            style="font-size: 13px; color: #e67e22; margin-left: 10px; display: none;">正在解析文档内容，请稍候...</span>
         </div>
 
         <form id="ai-form" action="/admin/generate-ai-content" method="POST">
@@ -65,14 +208,18 @@
             <div id="editor-container" style="height: 300px; overflow-y: hidden;"></div>
           </div>
           <input type="hidden" name="newMaterials" id="newMaterials">
-          
+
           <div style="margin-top: 15px;">
-            <button type="submit" class="btn" style="background: #8e44ad;" onclick="this.innerText='AI 思考并归档中...';">让 AI 智能分配内容并保存快照</button>
+            <button type="submit" class="btn" style="background: #8e44ad;" onclick="this.innerText='AI 思考并归档中...';">让 AI
+              智能分配内容并保存快照</button>
+            <!--预览生成的文档-->
+            <!-- <button class="btn" style="background: #2ecc71;" onclick="viewGeneratedDocument()"> -->
+            <!-- 预览按钮 -->
           </div>
         </form>
       </div>
 
-      <div class="card">
+      <div class="card" style="display: none;">
         <h3>当前大纲与资料</h3>
         <div style="overflow-x: auto;">
           <table>
@@ -84,31 +231,78 @@
               </tr>
             </thead>
             <tbody>
-              <% materials.forEach(item => { %>
+              <% materials.forEach(item=> { %>
                 <tr>
                   <td>
                     <div class="<%= item.level === 1 ? 'level-1' : 'level-2' %>">
                       <%= item.title %>
                     </div>
                   </td>
-                  <td><span style="color: <%= item.content ? '#27ae60' : '#e74c3c' %>"><%= item.content ? '已写入' : '暂无内容' %></span></td>
+                  <td><span style="color: <%= item.content ? '#27ae60' : '#e74c3c' %>">
+                      <%= item.content ? '已写入' : '暂无内容' %>
+                    </span></td>
                   <td>
                     <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                      <a href="/admin/clear-section-content/<%= item.id %>" class="btn-delete" onclick="return confirm('确定清空该章节正文？')">一键清空</a>
+                      <a href="/admin/clear-section-content/<%= item.id %>" class="btn-delete"
+                        onclick="return confirm('确定清空该章节正文？')">一键清空</a>
                     </div>
                     <!-- 单独附加媒体 -->
-                    <form action="/admin/add-to-section/<%= item.id %>" method="POST" enctype="multipart/form-data" style="margin-top: 8px; display: flex; gap: 5px; align-items: center;">
-                      <input type="file" name="media" accept="image/*,video/*" style="max-width: 140px; font-size: 12px;">
+                    <form action="/admin/add-to-section/<%= item.id %>" method="POST" enctype="multipart/form-data"
+                      style="margin-top: 8px; display: flex; gap: 5px; align-items: center;">
+                      <input type="file" name="media" accept="image/*,video/*"
+                        style="max-width: 140px; font-size: 12px;">
                       <button type="submit" class="btn" style="padding: 4px 8px; font-size: 12px;">传附件</button>
                     </form>
                   </td>
                 </tr>
-              <% }) %>
+                <% }) %>
             </tbody>
           </table>
         </div>
       </div>
-      
+
+      <!-- Upload History for department users -->
+      <div class="card" style="border-top: 4px solid #10b981;">
+        <h3>📁 历史上传与文件记录</h3>
+        <div style="max-height: 300px; overflow-y: auto;">
+          <table>
+            <thead>
+              <tr>
+                <th>文件名</th>
+                <th>上传人</th>
+                <th>时间</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% if (locals.uploads && uploads.length> 0) { %>
+                <% uploads.forEach(file=> { %>
+                  <tr>
+                    <td style="font-weight: 500;">
+                      <%= file.original_name %>
+                    </td>
+                    <td><span style="font-size: 12px; color: #666;">
+                        <%= file.username %>
+                      </span></td>
+                    <td style="font-size: 12px; color: #666;">
+                      <%= file.created_at %>
+                    </td>
+                    <td>
+                      <a href="<%= file.file_path %>" target="_blank" class="btn"
+                        style="padding: 4px 8px; font-size: 12px; background: #3498db;">预览</a>
+                    </td>
+                  </tr>
+                  <% }) %>
+                    <% } else { %>
+                      <tr>
+                        <td colspan="4" style="text-align:center; color:#999;">暂无上传记录</td>
+                      </tr>
+                      <% } %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       <!-- Activity Logs for normal users -->
       <div class="card" style="border-top: 4px solid #34495e;">
         <h3>📋 我的操作日志</h3>
@@ -122,108 +316,146 @@
               </tr>
             </thead>
             <tbody>
-              <% if (logs && logs.length > 0) { %>
-                <% logs.forEach(log => { %>
+              <% if (logs && logs.length> 0) { %>
+                <% logs.forEach(log=> { %>
                   <tr>
-                    <td style="font-size:12px; color:#666;"><%= log.created_at %></td>
-                    <td><%= log.action %></td>
-                    <td style="font-size:13px;"><%= log.details %></td>
+                    <td style="font-size:12px; color:#666;">
+                      <%= log.created_at %>
+                    </td>
+                    <td>
+                      <%= log.action %>
+                    </td>
+                    <td style="font-size:13px;">
+                      <%= log.details %>
+                    </td>
                   </tr>
-                <% }) %>
-              <% } else { %>
-                <tr><td colspan="3" style="text-align:center; color:#999;">暂无操作日志</td></tr>
-              <% } %>
+                  <% }) %>
+                    <% } else { %>
+                      <tr>
+                        <td colspan="3" style="text-align:center; color:#999;">暂无操作日志</td>
+                      </tr>
+                      <% } %>
             </tbody>
           </table>
         </div>
       </div>
-  </div>
+    </div>
 
-  <script src="https://unpkg.com/@wangeditor/editor@latest/dist/index.js"></script>
-  <script>
-    const { createEditor, createToolbar } = window.wangEditor;
-    if (document.getElementById('editor-container')) {
-      const editorConfig = {
+    <script src="https://unpkg.com/@wangeditor/editor@latest/dist/index.js"></script>
+    <script>
+      const { createEditor, createToolbar } = window.wangEditor;
+      if (document.getElementById('editor-container')) {
+        const editorConfig = {
           placeholder: '在这里输入或粘贴新增资料，支持直接上传图片或视频...',
           MENU_CONF: {
-              uploadImage: {
-                  server: '/admin/upload-media',
-                  fieldName: 'file',
-                  customInsert(res, insertFn) {
-                      insertFn(res.data.url, res.data.alt, res.data.href);
-                  }
-              },
-              uploadVideo: {
-                  server: '/admin/upload-media',
-                  fieldName: 'file',
-                  customInsert(res, insertFn) {
-                      insertFn(res.data.url);
-                  }
+            uploadImage: {
+              server: '/admin/upload-media',
+              fieldName: 'file',
+              customInsert(res, insertFn) {
+                insertFn(res.data.url, res.data.alt, res.data.href);
               }
+            },
+            uploadVideo: {
+              server: '/admin/upload-media',
+              fieldName: 'file',
+              customInsert(res, insertFn) {
+                insertFn(res.data.url);
+              }
+            }
           }
-      };
-      
-      const editor = createEditor({
+        };
+
+        const editor = createEditor({
           selector: '#editor-container',
           html: '',
           config: editorConfig,
           mode: 'default',
-      });
-      
-      const toolbar = createToolbar({
+        });
+
+        const toolbar = createToolbar({
           editor,
           selector: '#editor-toolbar',
           config: {},
           mode: 'default',
-      });
+        });
 
-      document.getElementById('ai-form').onsubmit = function() {
+        document.getElementById('ai-form').onsubmit = async function (e) {
+          e.preventDefault();
           if (editor.isEmpty()) {
-              alert('新增内容不能为空');
-              return false;
+            alert('新增内容不能为空');
+            return;
           }
-          document.getElementById('newMaterials').value = editor.getHtml();
-      };
-
-      // Document Parsing Logic
-      const docUpload = document.getElementById('document-upload');
-      if (docUpload) {
-        docUpload.addEventListener('change', async function(e) {
-          const file = e.target.files[0];
-          if (!file) return;
-
-          const formData = new FormData();
-          formData.append('file', file);
-
-          const statusSpan = document.getElementById('parse-status');
-          statusSpan.style.display = 'inline';
-          statusSpan.innerText = '正在解析文档内容，请稍候...';
-          statusSpan.style.color = '#e67e22';
+          
+          const btn = this.querySelector('button[type="submit"]');
+          const originalText = btn.innerText;
+          btn.disabled = true;
+          btn.innerText = 'AI 正在分析并归类 (预计15-60秒)...';
+          
+          const formData = new FormData(this);
+          formData.set('newMaterials', editor.getHtml());
           
           try {
-            const res = await fetch('/admin/parse-document', {
+            const res = await fetch('/admin/generate-ai-content', {
               method: 'POST',
-              body: formData
+              headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+              body: new URLSearchParams(formData).toString()
             });
+            
             const result = await res.json();
             if (res.ok) {
-              editor.dangerouslyInsertHtml(result.text);
-              statusSpan.innerText = '✅ 解析成功并已加载到编辑器！';
-              statusSpan.style.color = '#27ae60';
-              setTimeout(() => statusSpan.style.display = 'none', 5000);
+              alert(result.message || '处理成功');
+              window.location.reload();
             } else {
-              alert('解析失败: ' + result.error);
+              alert('处理失败: ' + (result.error || '未知错误'));
+            }
+          } catch (err) {
+            alert('发生网络错误或超时: ' + err.message);
+          } finally {
+            btn.disabled = false;
+            btn.innerText = originalText;
+          }
+        };
+
+        // Document Parsing Logic
+        const docUpload = document.getElementById('document-upload');
+        if (docUpload) {
+          docUpload.addEventListener('change', async function (e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            const statusSpan = document.getElementById('parse-status');
+            statusSpan.style.display = 'inline';
+            statusSpan.innerText = '正在解析文档内容，请稍候...';
+            statusSpan.style.color = '#e67e22';
+
+            try {
+              const res = await fetch('/admin/parse-document', {
+                method: 'POST',
+                body: formData
+              });
+              const result = await res.json();
+              if (res.ok) {
+                editor.dangerouslyInsertHtml(result.text);
+                statusSpan.innerText = '✅ 解析成功并已加载到编辑器！';
+                statusSpan.style.color = '#27ae60';
+                setTimeout(() => statusSpan.style.display = 'none', 5000);
+              } else {
+                alert('解析失败: ' + result.error);
+                statusSpan.style.display = 'none';
+              }
+            } catch (err) {
+              alert('上传解析时发生错误: ' + err.message);
               statusSpan.style.display = 'none';
             }
-          } catch(err) {
-            alert('上传解析时发生错误: ' + err.message);
-            statusSpan.style.display = 'none';
-          }
-          
-          e.target.value = ''; // Reset
-        });
+
+            e.target.value = ''; // Reset
+          });
+        }
       }
-    }
-  </script>
+    </script>
 </body>
+
 </html>

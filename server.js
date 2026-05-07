@@ -42,6 +42,7 @@ db.serialize(() => {
   });
   
   db.run(`CREATE TABLE IF NOT EXISTS activity_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT, department TEXT, action TEXT, details TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)`);
+  db.run(`CREATE TABLE IF NOT EXISTS user_uploads (id INTEGER PRIMARY KEY AUTOINCREMENT, filename TEXT, original_name TEXT, file_path TEXT, file_type TEXT, department TEXT, username TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)`);
 
   // Backward compatibility: Adding columns to old tables if they don't exist
   db.run(`ALTER TABLE materials ADD COLUMN department TEXT DEFAULT 'engineering'`, (err) => { });
@@ -60,6 +61,27 @@ db.serialize(() => {
       }
     });
   });
+
+  // Migrate existing department outlines into settings if not present
+  setTimeout(() => {
+    db.all("SELECT DISTINCT department FROM users WHERE role = 'editor'", (err, depts) => {
+      if (!err && depts) {
+        depts.forEach(d => {
+          const dept = d.department;
+          db.get("SELECT value FROM settings WHERE key = ?", ['template_' + dept], (err, row) => {
+            if (!row) {
+              db.all("SELECT title FROM materials WHERE department = ? ORDER BY id ASC", [dept], (err, mRows) => {
+                if (mRows && mRows.length > 0) {
+                  const templateText = mRows.map(r => r.title).join('\n');
+                  db.run("INSERT INTO settings (key, value) VALUES (?, ?)", ['template_' + dept, templateText]);
+                }
+              });
+            }
+          });
+        });
+      }
+    });
+  }, 1000);
 });
 
 // Configure multer for file uploads
@@ -198,7 +220,28 @@ app.get('/admin', isAuthenticated, (req, res) => {
       db.all('SELECT id, department, timestamp FROM document_versions ORDER BY id DESC', (err, versions) => {
         db.all('SELECT * FROM users WHERE role = "editor"', (err, users) => {
           db.all('SELECT * FROM activity_logs ORDER BY id DESC LIMIT 50', (err, logs) => {
-            res.render('admin_super', { apiKey, versions, departmentName: '总管理台', users: users || [], logs: logs || [] });
+            db.all("SELECT * FROM user_uploads ORDER BY id DESC LIMIT 50", (err, uploads) => {
+              db.all("SELECT key, value FROM settings WHERE key LIKE 'template_%'", (err, templateRows) => {
+                const templates = {};
+                if (templateRows) {
+                  templateRows.forEach(r => {
+                    templates[r.key.replace('template_', '')] = r.value;
+                  });
+                }
+                db.all("SELECT * FROM materials ORDER BY department, id ASC", (err, allMaterials) => {
+                  res.render('admin_super', { 
+                    apiKey, 
+                    versions: versions || [], 
+                    departmentName: '总管理台', 
+                    users: users || [], 
+                    logs: logs || [], 
+                    templates, 
+                    uploads: uploads || [], 
+                    allMaterials: allMaterials || [] 
+                  });
+                });
+              });
+            });
           });
         });
       });
@@ -209,7 +252,16 @@ app.get('/admin', isAuthenticated, (req, res) => {
   // Normal department users
   db.all('SELECT * FROM materials WHERE department = ? ORDER BY id ASC', [req.session.department], (err, materials) => {
     db.all('SELECT * FROM activity_logs WHERE username = ? ORDER BY id DESC LIMIT 20', [req.session.username], (err, logs) => {
-      res.render('admin', { materials, department: req.session.department, departmentName: req.session.departmentName, logs: logs || [] });
+      db.all('SELECT * FROM user_uploads WHERE department = ? AND username = ? ORDER BY id DESC LIMIT 20', [req.session.department, req.session.username], (err, uploads) => {
+        res.render('admin', { 
+          materials, 
+          department: req.session.department, 
+          departmentName: req.session.departmentName, 
+          username: req.session.username,
+          logs: logs || [], 
+          uploads: uploads || [] 
+        });
+      });
     });
   });
 });
@@ -247,9 +299,10 @@ app.post('/admin/init-outline', isAuthenticated, async (req, res) => {
   const lines = outline.split('\n').map(l => l.trim()).filter(l => l.length > 0);
 
   try {
-    let currentParentId = null;
-    db.serialize(() => {
-      db.run('BEGIN TRANSACTION');
+    db.run("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", ['template_' + targetDept, outline], (err) => {
+      let currentParentId = null;
+      db.serialize(() => {
+        db.run('BEGIN TRANSACTION');
 
       const insertRow = (title, level, parentId) => {
         return new Promise((resolve, reject) => {
@@ -261,17 +314,28 @@ app.post('/admin/init-outline', isAuthenticated, async (req, res) => {
       };
 
       (async function processLines() {
-        for (const title of lines) {
-          let level = 2;
-          if (/^[一二三四五六七八九十]+、/.test(title)) level = 1;
+        try {
+          for (const title of lines) {
+            let level = 2;
+            if (/^[一二三四五六七八九十]+、/.test(title)) level = 1;
 
-          let pId = (level === 1) ? null : currentParentId;
-          const insertedId = await insertRow(title, level, pId);
-          if (level === 1) currentParentId = insertedId;
+            let pId = (level === 1) ? null : currentParentId;
+            const insertedId = await insertRow(title, level, pId);
+            if (level === 1) currentParentId = insertedId;
+          }
+          db.run('COMMIT', () => {
+            db.run("INSERT INTO activity_logs (username, department, action, details) VALUES (?, ?, ?, ?)",
+              [req.session.username, targetDept, '初始化大纲', `重置了部门大纲，共 ${lines.length} 个章节`]);
+            res.redirect('/admin');
+          });
+        } catch (err) {
+          db.run('ROLLBACK');
+          console.error(err);
+          res.redirect('/admin');
         }
-        db.run('COMMIT', () => res.redirect('/admin'));
       })();
     });
+    }); // End settings insert
   } catch (e) {
     console.error(e);
     res.redirect('/admin');
@@ -283,12 +347,17 @@ app.post('/admin/generate-ai-content', isAuthenticated, async (req, res) => {
   const { newMaterials } = req.body;
   const dept = req.session.department;
 
+  // 1. Check content size (e.g., limit to 50k characters for stability)
+  if (newMaterials && newMaterials.length > 50000) {
+    return res.status(400).json({ error: '上传内容过大（限5万字以内），请分次处理以确保生成质量。' });
+  }
+
   db.get('SELECT value FROM settings WHERE key = ?', ['deepseek_api_key'], async (err, row) => {
     const apiKey = row ? row.value : null;
-    if (!apiKey) return res.send('请先配置 API Key');
+    if (!apiKey) return res.status(400).json({ error: '请先在系统设置中配置 API Key' });
 
     db.all('SELECT id, title, level, parent_id, content FROM materials WHERE department = ? ORDER BY id ASC', [dept], async (err, rows) => {
-      if (err || rows.length === 0) return res.redirect('/admin');
+      if (err || rows.length === 0) return res.status(400).json({ error: '当前部门大纲为空，请先初始化大纲。' });
 
       // Pass full content for fusion and deduplication
       const outlineContext = rows.map(r => `ID: ${r.id} | 层级: ${r.level} | 标题: ${r.title} | 现有完整内容: ${r.content || '空'}`).join('\n\n');
@@ -307,10 +376,15 @@ app.post('/admin/generate-ai-content', isAuthenticated, async (req, res) => {
 
       systemPrompt += `\n请严格返回合法JSON数组。示例格式：\n[\n  {"action": "overwrite", "id": 1, "content": "<p>融合去重后的全量新内容</p>"},\n  {"action": "create", "parent_id": 1, "title": "2. 新坑点", "content": "<p>新正文</p>"}\n]\n只输出JSON！`;
 
+      // 2. Setup Timeout Controller
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 seconds timeout
+
       try {
         const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+          signal: controller.signal,
           body: JSON.stringify({
             model: 'deepseek-v4-pro',
             messages: [
@@ -321,7 +395,12 @@ app.post('/admin/generate-ai-content', isAuthenticated, async (req, res) => {
           })
         });
 
-        if (!response.ok) return res.status(500).send("API Error: " + await response.text());
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+          const errorMsg = await response.text();
+          throw new Error("AI API Error: " + errorMsg);
+        }
 
         const data = await response.json();
         let text = data.choices[0].message.content.trim();
@@ -350,6 +429,10 @@ app.post('/admin/generate-ai-content', isAuthenticated, async (req, res) => {
         }
         fs.writeFileSync(path.join(__dirname, 'public/docs', mdFileName), mdContent);
 
+        // Record the AI generated archive in user_uploads table
+        db.run('INSERT INTO user_uploads (filename, original_name, file_path, file_type, department, username) VALUES (?, ?, ?, ?, ?, ?)',
+          [mdFileName, `AI提交归档_${timestamp}.md`, '/docs/' + mdFileName, 'ai_archive', dept, req.session.username]);
+
         // Update DB
         const updateStmt = db.prepare('UPDATE materials SET content = CASE WHEN content IS NULL OR content = "" THEN ? ELSE content || "<br><br>" || ? END WHERE id = ? AND department = ?');
         const overwriteStmt = db.prepare('UPDATE materials SET content = ? WHERE id = ? AND department = ?');
@@ -365,7 +448,6 @@ app.post('/admin/generate-ai-content', isAuthenticated, async (req, res) => {
             } else if (up.action === 'create' && up.parent_id && up.title && up.content) {
               createStmt.run(up.title, up.content, dept, up.parent_id);
             } else if (up.id && up.content && !up.action) {
-              // fallback for older AI generation format
               updateStmt.run(up.content, up.content, up.id, dept);
             }
           }
@@ -379,21 +461,26 @@ app.post('/admin/generate-ai-content', isAuthenticated, async (req, res) => {
               if (!err && currentRows) {
                 const snapshot = JSON.stringify(currentRows);
                 const tsName = new Date().toLocaleString();
-                db.run('INSERT INTO document_versions (department, timestamp, snapshot) VALUES (?, ?, ?)', [dept, tsName, snapshot], () => {
-                  db.run('INSERT INTO activity_logs (username, department, action, details) VALUES (?, ?, ?, ?)', 
-                    [req.session.username, dept, '新增内容 (AI归档)', '新提交了一批内容，并生成了最新快照版本'], () => {
-                      res.redirect('/admin'); 
-                  });
-                });
-              } else {
-                res.redirect('/admin'); 
+                db.run('INSERT INTO document_versions (department, timestamp, snapshot) VALUES (?, ?, ?)', [dept, tsName, snapshot]);
               }
             });
+
+            db.run("INSERT INTO activity_logs (username, department, action, details) VALUES (?, ?, ?, ?)",
+              [req.session.username, dept, 'AI智能填充', `成功处理新资料，归档: ${mdFileName}`]);
+            
+            res.json({ success: true, message: 'AI 处理并归档成功' });
           });
         });
-
       } catch (err) {
-        res.status(500).send("AI Processing Error: " + err.message);
+        clearTimeout(timeoutId);
+        console.error("AI Generation Error:", err);
+        
+        const errorDetail = err.name === 'AbortError' ? 'AI 请求超时（60秒），可能是内容过多或网络拥堵，请尝试分段处理。' : err.message;
+        
+        db.run("INSERT INTO activity_logs (username, department, action, details) VALUES (?, ?, ?, ?)",
+          [req.session.username, dept, 'AI处理失败', `错误: ${errorDetail.substring(0, 200)}`]);
+          
+        res.status(500).json({ error: errorDetail });
       }
     });
   });
@@ -416,9 +503,13 @@ app.post('/admin/upload-media', isAuthenticated, upload.single('file'), (req, re
 
 // Provide manual section update without rich text popup (if needed)
 app.post('/admin/add-to-section/:id', isAuthenticated, upload.single('media'), (req, res) => {
-  if (!req.file) return res.redirect('/admin');
   const media_path = '/uploads/' + req.file.filename;
   const media_type = req.file.mimetype.startsWith('image/') ? 'image' : (req.file.mimetype.startsWith('video/') ? 'video' : null);
+  
+  // Log upload
+  db.run('INSERT INTO user_uploads (filename, original_name, file_path, file_type, department, username) VALUES (?, ?, ?, ?, ?, ?)',
+    [req.file.filename, req.file.originalname, media_path, media_type, req.session.department, req.session.username]);
+
   db.run('UPDATE materials SET media_path = ?, media_type = ? WHERE id = ? AND department = ?', [media_path, media_type, req.params.id, req.session.department], () => res.redirect('/admin'));
 });
 
@@ -437,6 +528,10 @@ app.post('/admin/parse-document', isAuthenticated, upload.single('file'), async 
   const ext = path.extname(req.file.originalname).toLowerCase();
   const filePath = req.file.path;
   let textContent = '';
+
+  // Log parsed upload
+  db.run('INSERT INTO user_uploads (filename, original_name, file_path, file_type, department, username) VALUES (?, ?, ?, ?, ?, ?)',
+    [req.file.filename, req.file.originalname, '/uploads/' + req.file.filename, 'document', req.session.department, req.session.username]);
 
   try {
     let isHtml = false;
@@ -486,4 +581,17 @@ app.post('/admin/parse-document', isAuthenticated, upload.single('file'), async 
   }
 });
 
-app.listen(port, () => console.log(`Document server listening at http://localhost:${port}`));
+app.listen(port, '0.0.0.0', () => {
+  console.log(`Document server is running!`);
+  console.log(`- Local Access: http://localhost:${port}`);
+  
+  const os = require('os');
+  const nets = os.networkInterfaces();
+  for (const name of Object.keys(nets)) {
+    for (const net of nets[name]) {
+      if (net.family === 'IPv4' && !net.internal) {
+        console.log(`- Network Access: http://${net.address}:${port}`);
+      }
+    }
+  }
+});

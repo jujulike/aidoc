@@ -6,8 +6,6 @@
 .env
 /tests/tmp
 /tests/.phpunit.result.cache
-database.sqlite
-/public/uploads
 /node_modules
 /data
 /docs_backup

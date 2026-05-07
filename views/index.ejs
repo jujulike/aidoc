@@ -533,6 +533,40 @@
             if (window.innerWidth <= 768) toggleMenu();
           });
         });
+
+        // Scroll spy to highlight sidebar item based on scroll position
+        const sections = document.querySelectorAll('.material-section, .material-sub-section');
+        const navLinks = document.querySelectorAll('.sidebar a[href^="#"]');
+
+        window.addEventListener('scroll', () => {
+          let currentId = '';
+          sections.forEach(section => {
+            const sectionTop = section.offsetTop;
+            // 150px offset to trigger slightly before the section hits the top
+            if (window.scrollY >= (sectionTop - 150)) {
+              currentId = section.getAttribute('id');
+            }
+          });
+
+          if (currentId) {
+            navLinks.forEach(a => {
+              a.classList.remove('active');
+              if (a.getAttribute('href') === '#' + currentId) {
+                a.classList.add('active');
+                
+                // Automatically expand the parent menu if a child is active
+                if (a.classList.contains('toc-level-2')) {
+                  const submenu = a.closest('ul');
+                  if (submenu && submenu.style.display === 'none') {
+                    submenu.style.display = 'block';
+                    const toggleBtn = submenu.parentElement.querySelector('.toggle-btn');
+                    if (toggleBtn) toggleBtn.style.transform = 'rotate(0deg)';
+                  }
+                }
+              }
+            });
+          }
+        });
       </script>
 </body>
 
