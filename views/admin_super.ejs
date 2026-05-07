@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>总管理台 - 系统设置</title>
+  <style>
+    body { font-family: 'Segoe UI', sans-serif; background: #f4f6f9; margin: 0; padding: 20px; color: #333; }
+    .container { max-width: 900px; margin: 0 auto; }
+    .header { display: flex; justify-content: space-between; align-items: center; background: white; padding: 15px 25px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); margin-bottom: 20px; }
+    .card { background: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); margin-bottom: 20px; }
+    h3 { margin-top: 0; color: #2c3e50; }
+    .btn { background: #3498db; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; text-decoration: none; display: inline-block; }
+    .btn:hover { background: #2980b9; }
+    .btn-danger { background: #e74c3c; }
+    .btn-danger:hover { background: #c0392b; }
+    input[type="text"], input[type="password"], textarea, select { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; margin-bottom: 10px; }
+    textarea { height: 120px; font-family: monospace; }
+    table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 14px; }
+    table th, table td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+    table th { background-color: #f9f9f9; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h2>👑 总管理台</h2>
+      <div>
+        <a href="/logout" class="btn btn-danger">退出登录</a>
+      </div>
+    </div>
+
+    <!-- API Key Settings -->
+    <div class="card" style="border-top: 4px solid #3498db;">
+      <h3>🔑 API Key 配置</h3>
+      <form action="/admin/settings" method="POST">
+        <label style="display:block; margin-bottom: 5px;">DeepSeek API Key</label>
+        <div style="display: flex; gap: 10px;">
+          <input type="text" name="apiKey" value="<%= apiKey %>" placeholder="输入 DeepSeek API Key">
+          <button type="submit" class="btn">保存</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Initialize Outline -->
+    <div class="card" style="border-top: 4px solid #9b59b6;">
+      <h3>📝 初始化文档大纲</h3>
+      <form action="/admin/init-outline" method="POST" onsubmit="return confirm('警告：这将重置并覆盖指定部门的当前大纲结构！确定吗？')">
+        <label style="display:block; margin-bottom: 5px;">选择部门</label>
+        <select name="targetDept">
+          <% users.forEach(u => { %>
+            <option value="<%= u.department %>"><%= u.department_name %></option>
+          <% }) %>
+        </select>
+        <label style="display:block; margin-bottom: 5px; margin-top: 10px;">输入大纲内容 (层级示例：一、某章节 1.某小节)</label>
+        <textarea name="outline" placeholder="例如：
+一、某章节
+1.某小节
+2.某小节
+二、某章节
+1.某小节"></textarea>
+        <button type="submit" class="btn" style="background:#9b59b6;">生成并重置大纲</button>
+      </form>
+    </div>
+
+    <!-- Version History -->
+    <div class="card" style="border-top: 4px solid #f39c12;">
+      <h3>⏳ 全局文档版本管理 (历史快照)</h3>
+      <p style="color: #666; font-size: 13px;">包含所有部门每次 AI 更新后的全量快照。</p>
+      <ul>
+        <% if (versions && versions.length > 0) { %>
+          <% versions.forEach(v => { %>
+            <li style="margin-bottom: 8px;">
+              <span style="display:inline-block; width: 60px; color: #888;">[<%= v.department === 'engineering' ? '工程部' : '设计部' %>]</span>
+              <a href="/doc/<%= v.department %>?vid=<%= v.id %>" target="_blank" style="color: #2980b9; text-decoration: none;">📄 预览 <%= v.timestamp %> 版本</a>
+            </li>
+          <% }) %>
+        <% } else { %>
+          <li style="color: #999;">暂无历史记录</li>
+        <% } %>
+      </ul>
+    </div>
+    <!-- Account Management -->
+    <div class="card" style="border-top: 4px solid #27ae60;">
+      <h3>👥 账号与部门管理</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>账号ID</th>
+            <th>用户名</th>
+            <th>部门标识</th>
+            <th>部门名称</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% users.forEach(u => { %>
+            <tr>
+              <td><%= u.id %></td>
+              <td><%= u.username %></td>
+              <td><%= u.department %></td>
+              <td><%= u.department_name %></td>
+              <td>
+                <form action="/admin/users/delete" method="POST" style="display:inline;" onsubmit="return confirm('确定要删除此账号吗？')">
+                  <input type="hidden" name="id" value="<%= u.id %>">
+                  <button type="submit" class="btn btn-danger" style="padding: 4px 8px; font-size: 12px;">删除</button>
+                </form>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+
+      <h4 style="margin-top: 20px;">添加新部门/账号</h4>
+      <form action="/admin/users" method="POST" style="display:flex; gap:10px; flex-wrap:wrap; align-items: flex-end;">
+        <div style="flex: 1; min-width: 150px;">
+          <label style="font-size: 13px;">用户名(登录用)</label>
+          <input type="text" name="username" required>
+        </div>
+        <div style="flex: 1; min-width: 150px;">
+          <label style="font-size: 13px;">密码</label>
+          <input type="text" name="password" required>
+        </div>
+        <div style="flex: 1; min-width: 150px;">
+          <label style="font-size: 13px;">部门标识(英文字母)</label>
+          <input type="text" name="department" placeholder="例如: hr" required>
+        </div>
+        <div style="flex: 1; min-width: 150px;">
+          <label style="font-size: 13px;">部门名称(展示用)</label>
+          <input type="text" name="department_name" placeholder="例如: 人事部" required>
+        </div>
+        <button type="submit" class="btn" style="background: #27ae60; margin-bottom: 10px;">添加</button>
+      </form>
+    </div>
+
+    <!-- Activity Logs -->
+    <div class="card" style="border-top: 4px solid #34495e;">
+      <h3>📋 全局操作日志</h3>
+      <p style="color: #666; font-size: 13px;">展示各账号添加内容的记录。</p>
+      <div style="max-height: 400px; overflow-y: auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>时间</th>
+              <th>账号</th>
+              <th>部门</th>
+              <th>操作</th>
+              <th>详情</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% if (logs && logs.length > 0) { %>
+              <% logs.forEach(log => { %>
+                <tr>
+                  <td style="font-size:12px; color:#666;"><%= log.created_at %></td>
+                  <td><%= log.username %></td>
+                  <td><%= log.department %></td>
+                  <td><%= log.action %></td>
+                  <td style="font-size:13px;"><%= log.details %></td>
+                </tr>
+              <% }) %>
+            <% } else { %>
+              <tr><td colspan="5" style="text-align:center; color:#999;">暂无操作日志</td></tr>
+            <% } %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

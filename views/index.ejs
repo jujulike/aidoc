@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>
+    <%= departmentName %> 文档
+  </title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0;
+      padding: 0;
+      color: #333;
+      background-color: #f9f9f9;
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+
+    /* Clean Documentation Theme */
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
+      margin: 0;
+      padding: 0;
+      color: #2c3e50;
+      background-color: #fff;
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+      line-height: 1.7;
+    }
+
+    /* Top Navbar for Mobile */
+    .mobile-header {
+      display: none;
+      background-color: #fff;
+      color: #2c3e50;
+      padding: 15px;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      border-bottom: 1px solid #eaecef;
+    }
+
+    .mobile-header h2 {
+      margin: 0;
+      font-size: 1.2rem;
+    }
+
+    .menu-btn {
+      background: none;
+      border: none;
+      color: #3eaf7c;
+      font-size: 1.5rem;
+      cursor: pointer;
+    }
+
+    /* Sidebar */
+    .sidebar {
+      width: 300px;
+      height: 100vh;
+      background-color: #fff;
+      border-right: 1px solid #eaecef;
+      position: fixed;
+      overflow-y: auto;
+      padding: 20px 0;
+      z-index: 99;
+      transition: transform 0.3s ease;
+      box-sizing: border-box;
+    }
+
+    .sidebar::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .sidebar::-webkit-scrollbar-thumb {
+      background: #ccc;
+      border-radius: 3px;
+    }
+
+    .sidebar-header {
+      text-align: center;
+      margin-bottom: 20px;
+      padding: 0 20px;
+      font-weight: bold;
+      font-size: 1.2rem;
+      color: #2c3e50;
+    }
+
+    .sidebar ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .sidebar ul li {
+      margin: 0;
+    }
+
+    .sidebar ul li a {
+      display: block;
+      padding: 8px 24px;
+      color: #2c3e50;
+      text-decoration: none;
+      font-size: 15px;
+      transition: color 0.2s;
+      border-left: 3px solid transparent;
+    }
+
+    .sidebar ul li a:hover {
+      color: #3eaf7c;
+    }
+
+    .sidebar ul li a.active {
+      color: #3eaf7c;
+      border-left-color: #3eaf7c;
+      font-weight: 500;
+    }
+
+    .toc-level-1 {
+      font-weight: 600;
+      margin-top: 10px;
+    }
+
+    .sidebar ul ul {
+      padding-left: 0;
+    }
+
+    .sidebar ul ul li a {
+      padding-left: 40px;
+      font-size: 14px;
+      font-weight: normal;
+      color: #555;
+    }
+
+    .sidebar ul ul li a:hover {
+      color: #3eaf7c;
+    }
+
+    /* Content Area */
+    .content {
+      margin-left: 300px;
+      padding: 40px 60px;
+      flex: 1;
+      max-width: 1000px;
+      box-sizing: border-box;
+      background: #fff;
+    }
+
+    .material-section {
+      margin-bottom: 60px;
+      scroll-margin-top: 20px;
+    }
+
+    .title-level-1 {
+      margin-top: 0;
+      font-size: 2rem;
+      font-weight: 600;
+      color: #2c3e50;
+      padding-bottom: 0.3em;
+      border-bottom: 1px solid #eaecef;
+      margin-bottom: 24px;
+    }
+
+    .title-level-2 {
+      margin-top: 45px;
+      font-size: 1.5rem;
+      font-weight: 600;
+      color: #2c3e50;
+      margin-bottom: 16px;
+    }
+
+    .content-body {
+      margin-top: 15px;
+      overflow-wrap: break-word;
+      color: #34495e;
+      font-size: 16px;
+    }
+
+    .content-body p {
+      margin-top: 0;
+      margin-bottom: 16px;
+    }
+
+    .content-body img,
+    .content-body video {
+      max-width: 100%;
+      height: auto;
+      border-radius: 4px;
+      display: block;
+      margin: 20px 0;
+      border: 1px solid #eaecef;
+    }
+
+    /* Code Blocks styling based on image */
+    .content-body pre {
+      background-color: #282c34;
+      color: #ccc;
+      padding: 1.25rem 1.5rem;
+      border-radius: 6px;
+      overflow: auto;
+      line-height: 1.5;
+      font-family: Consolas, Monaco, 'Andale Mono', 'Ubuntu Mono', monospace;
+    }
+
+    .content-body code {
+      font-family: Consolas, Monaco, 'Andale Mono', 'Ubuntu Mono', monospace;
+    }
+
+    /* Individual Media attachment */
+    .media-container {
+      margin-top: 20px;
+    }
+
+    .media-container img,
+    .media-container video {
+      max-width: 100%;
+      border-radius: 4px;
+      border: 1px solid #eaecef;
+    }
+
+    .floating-nav {
+      position: fixed;
+      top: 15px;
+      right: 20px;
+      display: flex;
+      gap: 10px;
+      z-index: 101;
+    }
+
+    .floating-nav a {
+      padding: 6px 12px;
+      text-decoration: none;
+      border-radius: 4px;
+      font-size: 13px;
+      color: #fff;
+      font-weight: 500;
+    }
+
+    .home-link {
+      background: #3eaf7c;
+    }
+
+    .admin-link {
+      background: #3498db;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 50px;
+      color: #7f8c8d;
+      margin-top: 50px;
+    }
+
+    /* Mobile Responsive */
+    @media (max-width: 768px) {
+      .mobile-header {
+        display: flex;
+      }
+
+      .sidebar {
+        transform: translateX(-100%);
+        width: 280px;
+        box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+        border-right: none;
+      }
+
+      .sidebar.open {
+        transform: translateX(0);
+      }
+
+      .content {
+        margin-left: 0;
+        padding: 20px 25px;
+        width: 100%;
+      }
+
+      .floating-nav {
+        display: none;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <% if (typeof isHistory !=='undefined' && isHistory) { %>
+    <div
+      style="background-color: #f39c12; color: #fff; text-align: center; padding: 10px; font-weight: bold; position: sticky; top: 0; z-index: 9999;">
+      ⚠️ 正在预览历史版本 - <a href="/doc/<%= department %>" style="color: white; text-decoration: underline;">点击返回最新实时文档</a>
+    </div>
+    <% } %>
+
+      <!-- Mobile Header -->
+      <div class="mobile-header">
+        <button class="menu-btn" onclick="toggleMenu()">☰</button>
+        <h2>
+          <%= departmentName %>
+        </h2>
+      </div>
+
+      <div class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+          <%= departmentName %> 文档
+        </div>
+
+        <div style="padding: 0 20px 15px;">
+          <input type="text" id="searchInput" placeholder="搜索关键字..." oninput="filterMenu()"
+            style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; font-size: 13px;">
+        </div>
+
+        <ul onclick="if(window.innerWidth<=768 && event.target.tagName === 'A') toggleMenu()">
+          <% if (grouped.length===0) { %>
+            <li><a href="#">暂无内容</a></li>
+            <% } else { %>
+              <% grouped.forEach((item)=> { %>
+                <li>
+                  <div style="display: flex; align-items: center; justify-content: space-between; padding-right: 15px;">
+                    <a href="#section-<%= item.id %>" class="toc-level-1" style="flex: 1;">
+                      <%= item.title %>
+                    </a>
+                    <% if (item.children && item.children.length> 0) { %>
+                      <span class="toggle-btn" onclick="toggleSubmenu(event, 'submenu-<%= item.id %>')"
+                        style="cursor: pointer; padding: 5px; color: #888; font-size: 12px; transition: transform 0.2s;">▼</span>
+                      <% } %>
+                  </div>
+                  <% if (item.children && item.children.length> 0) { %>
+                    <ul id="submenu-<%= item.id %>">
+                      <% item.children.forEach((child)=> { %>
+                        <li><a href="#section-<%= child.id %>" class="toc-level-2">
+                            <%= child.title %>
+                          </a></li>
+                        <% }) %>
+                    </ul>
+                    <% } %>
+                </li>
+                <% }) %>
+                  <% } %>
+        </ul>
+      </div>
+
+      <div class="content">
+        <% if (grouped.length===0) { %>
+          <div class="empty-state">
+            <h2>大纲尚未初始化</h2>
+            <p>请联系管理员登录后台初始化文档框架。</p>
+          </div>
+          <% } else { %>
+            <% grouped.forEach((item)=> { %>
+              <div class="material-section" id="section-<%= item.id %>">
+                <h2 class="title-level-1">
+                  <%= item.title %>
+                </h2>
+
+                <% if (item.content) { %>
+                  <div class="content-body"><%- item.content %></div>
+                  <% } %>
+                    <% if (item.media_path) { %>
+                      <div class="media-container">
+                        <% if (item.media_type==='image' ) { %>
+                          <img src="<%= item.media_path %>" alt="附加图片">
+                          <% } else if (item.media_type==='video' ) { %>
+                            <video src="<%= item.media_path %>" controls style="max-width: 100%;"></video>
+                            <% } %>
+                      </div>
+                      <% } %>
+
+                        <% if (item.children && item.children.length> 0) { %>
+                          <div class="sub-sections">
+                            <% item.children.forEach((child)=> { %>
+                              <div class="material-sub-section" id="section-<%= child.id %>" style="margin-top: 30px;">
+                                <h3 class="title-level-2">
+                                  <%= child.title %>
+                                </h3>
+                                <% if (child.content) { %>
+                                  <div class="content-body"><%- child.content %></div>
+                                  <% } %>
+                                    <% if (child.media_path) { %>
+                                      <div class="media-container">
+                                        <% if (child.media_type==='image' ) { %>
+                                          <img src="<%= child.media_path %>" alt="附加图片">
+                                          <% } else if (child.media_type==='video' ) { %>
+                                            <video src="<%= child.media_path %>" controls
+                                              style="max-width: 100%;"></video>
+                                            <% } %>
+                                      </div>
+                                      <% } %>
+                              </div>
+                              <% }) %>
+                          </div>
+                          <% } %>
+              </div>
+              <% }) %>
+                <% } %>
+      </div>
+
+      <script>
+        function toggleMenu() {
+          const sidebar = document.getElementById('sidebar');
+          sidebar.classList.toggle('open');
+        }
+
+        function toggleSubmenu(e, submenuId) {
+          e.stopPropagation();
+          const submenu = document.getElementById(submenuId);
+          const btn = e.target;
+          if (submenu.style.display === 'none') {
+            submenu.style.display = 'block';
+            btn.style.transform = 'rotate(0deg)';
+          } else {
+            submenu.style.display = 'none';
+            btn.style.transform = 'rotate(-90deg)';
+          }
+        }
+
+        function removeHighlights() {
+          document.querySelectorAll('mark.highlight').forEach(mark => {
+            const parent = mark.parentNode;
+            parent.replaceChild(document.createTextNode(mark.textContent), mark);
+            parent.normalize();
+          });
+        }
+
+        function addHighlights(keyword) {
+          if (!keyword) return;
+          // We want to highlight inside .content-body, .title-level-1, .title-level-2
+          const els = document.querySelectorAll('.content-body, .title-level-1, .title-level-2');
+          const regex = new RegExp('(' + keyword.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&') + ')', 'gi');
+
+          els.forEach(el => {
+            const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null, false);
+            const textNodes = [];
+            let node;
+            while (node = walker.nextNode()) textNodes.push(node);
+
+            textNodes.forEach(textNode => {
+              const text = textNode.nodeValue;
+              if (text.toLowerCase().includes(keyword)) {
+                const span = document.createElement('span');
+                span.innerHTML = text.replace(regex, `<mark class="highlight" style="background-color: yellow; color: black; font-weight: bold;">$1</mark>`);
+                const parent = textNode.parentNode;
+                while (span.firstChild) {
+                  parent.insertBefore(span.firstChild, textNode);
+                }
+                parent.removeChild(textNode);
+              }
+            });
+          });
+        }
+
+        function filterMenu() {
+          const keyword = document.getElementById('searchInput').value.toLowerCase();
+          const topLis = document.querySelectorAll('.sidebar > ul > li');
+          const allSections = document.querySelectorAll('.material-section, .material-sub-section');
+
+          removeHighlights();
+          addHighlights(keyword);
+
+          if (!keyword) {
+            topLis.forEach(li => {
+              if (li.querySelector('a').innerText === '暂无内容') return;
+              li.style.display = '';
+              const subLis = li.querySelectorAll('ul > li');
+              subLis.forEach(sub => sub.style.display = '');
+            });
+            allSections.forEach(sec => sec.style.display = '');
+            return;
+          }
+
+          topLis.forEach(li => {
+            if (li.querySelector('a').innerText === '暂无内容') return;
+
+            const parentA = li.querySelector('.toc-level-1');
+            const parentId = parentA.getAttribute('href').substring(1);
+            const parentSection = document.getElementById(parentId);
+
+            let parentMatches = parentA.innerText.toLowerCase().includes(keyword);
+            if (!parentMatches && parentSection) {
+              // Check parent's own content body (excluding children)
+              const pb = Array.from(parentSection.childNodes).find(n => n.classList && n.classList.contains('content-body'));
+              if (pb && pb.innerText.toLowerCase().includes(keyword)) parentMatches = true;
+            }
+
+            let childMatches = false;
+
+            const subLis = li.querySelectorAll('ul > li');
+            subLis.forEach(subLi => {
+              const childA = subLi.querySelector('.toc-level-2');
+              const childId = childA.getAttribute('href').substring(1);
+              const childSection = document.getElementById(childId);
+
+              let childMatch = childA.innerText.toLowerCase().includes(keyword);
+              if (!childMatch && childSection) {
+                const cb = childSection.querySelector('.content-body');
+                if (cb && cb.innerText.toLowerCase().includes(keyword)) childMatch = true;
+              }
+
+              if (childMatch) {
+                subLi.style.display = '';
+                if (childSection) childSection.style.display = '';
+                childMatches = true;
+              } else {
+                subLi.style.display = parentMatches ? '' : 'none';
+                if (childSection) childSection.style.display = parentMatches ? '' : 'none';
+              }
+            });
+
+            if (parentMatches || childMatches) {
+              li.style.display = '';
+              if (parentSection) parentSection.style.display = '';
+              const submenu = li.querySelector('ul');
+              const toggleBtn = li.querySelector('.toggle-btn');
+              if (submenu) {
+                submenu.style.display = 'block';
+                if (toggleBtn) toggleBtn.style.transform = 'rotate(0deg)';
+              }
+            } else {
+              li.style.display = 'none';
+              if (parentSection) parentSection.style.display = 'none';
+            }
+          });
+        }
+
+        // Simple smooth scroll and active state handler for sidebar
+        document.querySelectorAll('.sidebar a[href^="#"]').forEach(anchor => {
+          anchor.addEventListener('click', function (e) {
+            document.querySelectorAll('.sidebar a').forEach(a => a.classList.remove('active'));
+            this.classList.add('active');
+            if (window.innerWidth <= 768) toggleMenu();
+          });
+        });
+      </script>
+</body>
+
+</html>
