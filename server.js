@@ -304,6 +304,14 @@ app.post('/admin/init-outline', isAuthenticated, async (req, res) => {
       db.serialize(() => {
         db.run('BEGIN TRANSACTION');
 
+        db.run('DELETE FROM materials WHERE department = ?', [targetDept], function(err) {
+          if (err) {
+            db.run('ROLLBACK');
+            console.error(err);
+            return res.redirect('/admin');
+          }
+        });
+
       const insertRow = (title, level, parentId) => {
         return new Promise((resolve, reject) => {
           db.run('INSERT INTO materials (title, content, department, level, parent_id) VALUES (?, "", ?, ?, ?)',
