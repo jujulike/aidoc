@@ -10,6 +10,7 @@ const pdfParse = require('pdf-parse');
 
 const app = express();
 const port = 3000;
+const aiTasks = {};
 
 // Setup database
 const dbPath = path.join(__dirname, 'database.sqlite');
@@ -287,108 +288,221 @@ app.post('/admin/settings', isAuthenticated, (req, res) => {
   db.run('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', ['deepseek_api_key', apiKey], () => res.redirect('/admin'));
 });
 
-// Init outline with level detection
+// Init outline with level detection and AI content migration (async)
 app.post('/admin/init-outline', isAuthenticated, async (req, res) => {
-  // admin can initialize outline for any department
   if (req.session.department !== 'admin') return res.redirect('/admin');
   
   const { outline, targetDept } = req.body;
   if (!outline || !targetDept) return res.redirect('/admin');
-  if (!outline) return res.redirect('/admin');
 
   const lines = outline.split('\n').map(l => l.trim()).filter(l => l.length > 0);
 
-  try {
+  // Step 1: 获取旧数据并备份
+  db.all('SELECT * FROM materials WHERE department = ? ORDER BY id ASC', [targetDept], (err, oldRows) => {
+    if (err) return res.redirect('/admin');
+
+    // 备份到版本历史
+    if (oldRows && oldRows.length > 0) {
+      const snapshot = JSON.stringify(oldRows);
+      const tsName = new Date().toLocaleString();
+      db.run('INSERT INTO document_versions (department, timestamp, snapshot) VALUES (?, ?, ?)', [targetDept, tsName, snapshot]);
+    }
+
+    const hasContent = oldRows && oldRows.some(r => r.content && r.content.length > 0);
+
+    // Step 2: 保存模板
     db.run("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", ['template_' + targetDept, outline], (err) => {
-      let currentParentId = null;
-      db.serialize(() => {
-        db.run('BEGIN TRANSACTION');
+      if (err) return res.redirect('/admin');
 
-        db.run('DELETE FROM materials WHERE department = ?', [targetDept], function(err) {
-          if (err) {
-            db.run('ROLLBACK');
-            console.error(err);
-            return res.redirect('/admin');
-          }
-        });
+      // Step 3: 清空旧数据
+      db.run('DELETE FROM materials WHERE department = ?', [targetDept], (err) => {
+        if (err) return res.redirect('/admin');
 
-      const insertRow = (title, level, parentId) => {
-        return new Promise((resolve, reject) => {
-          db.run('INSERT INTO materials (title, content, department, level, parent_id) VALUES (?, "", ?, ?, ?)',
-            [title, targetDept, level, parentId], function (err) {
-              if (err) reject(err); else resolve(this.lastID);
+        // Step 4: 批量插入新大纲（使用事务一次性完成）
+        let currentParentId = null;
+        const insertSQL = [];
+        const params = [];
+        
+        for (const title of lines) {
+          let level = 2;
+          if (/^[一二三四五六七八九十]+、/.test(title)) level = 1;
+          let pId = (level === 1) ? null : currentParentId;
+          insertSQL.push('(?, "", ?, ?, ?)');
+          params.push(title, targetDept, level, pId);
+          if (level === 1) currentParentId = null; // 暂时标记，后续通过查询修正
+        }
+
+        db.run('INSERT INTO materials (title, content, department, level, parent_id) VALUES ' + insertSQL.join(','), params, function(err) {
+          if (err) return res.redirect('/admin');
+
+          // 修正 parent_id：查询刚插入的数据并建立父子关系
+          db.all('SELECT id, title, level FROM materials WHERE department = ? ORDER BY id ASC', [targetDept], (err, newRows) => {
+            if (err) return res.redirect('/admin');
+
+            const idMap = [];
+            let lastL1 = null;
+            newRows.forEach(r => {
+              if (r.level === 1) { lastL1 = r.id; }
+              idMap.push({ id: r.id, level: r.level, parent: lastL1 });
             });
-        });
-      };
 
-      (async function processLines() {
-        try {
-          for (const title of lines) {
-            let level = 2;
-            if (/^[一二三四五六七八九十]+、/.test(title)) level = 1;
+            // 更新 parent_id
+            const updates = idMap.filter(x => x.level === 2 && x.parent).map(x => `WHEN id=${x.id} THEN ${x.parent}`);
+            if (updates.length > 0) {
+              db.run(`UPDATE materials SET parent_id = CASE ${updates.join(' ')} END WHERE department = ? AND level = 2`, [targetDept]);
+            }
 
-            let pId = (level === 1) ? null : currentParentId;
-            const insertedId = await insertRow(title, level, pId);
-            if (level === 1) currentParentId = insertedId;
-          }
-          db.run('COMMIT', () => {
+            // Step 5: 如果有内容，后台异步AI迁移
+            if (hasContent && oldRows) {
+              const taskId = 'outline-' + Date.now().toString() + '-' + Math.random().toString(36).substring(2, 7);
+              aiTasks[taskId] = { status: 'processing', progress: '正在调用 AI 迁移内容...' };
+
+              migrateContentWithAIAsync(targetDept, oldRows, newRows, taskId, req.session.username);
+            }
+
             db.run("INSERT INTO activity_logs (username, department, action, details) VALUES (?, ?, ?, ?)",
-              [req.session.username, targetDept, '初始化大纲', `重置了部门大纲，共 ${lines.length} 个章节`]);
+              [req.session.username, targetDept, '重置大纲', `重置大纲共 ${lines.length} 章节${hasContent ? '，原内容正在后台AI迁移中' : '（无内容需迁移）'}，旧版本已归档`]);
             res.redirect('/admin');
           });
-        } catch (err) {
-          db.run('ROLLBACK');
-          console.error(err);
-          res.redirect('/admin');
-        }
-      })();
+        });
+      });
     });
-    }); // End settings insert
-  } catch (e) {
-    console.error(e);
-    res.redirect('/admin');
-  }
+  });
 });
 
-// AI Generate content & Save to MD
+// AI 内容迁移函数（异步）
+async function migrateContentWithAIAsync(targetDept, oldRows, newRows, taskId, username) {
+  try {
+    const apiKeyRow = await new Promise((resolve, reject) => {
+      db.get('SELECT value FROM settings WHERE key = ?', ['deepseek_api_key'], (err, row) => {
+        if (err) reject(err); else resolve(row);
+      });
+    });
+
+    if (!apiKeyRow || !apiKeyRow.value) {
+      aiTasks[taskId] = { status: 'completed', message: '无 API Key，跳过AI迁移' };
+      return;
+    }
+
+    const apiKey = apiKeyRow.value;
+    
+    // 精简上下文
+    const oldContent = oldRows.filter(r => r.content).map(r => {
+      const summary = r.content.substring(0, 150).replace(/<[^>]*>/g, '');
+      return `【旧: ${r.title}】${summary}${r.content.length > 150 ? '...' : ''}`;
+    }).join('\n');
+
+    const newOutline = newRows.map(r => `ID:${r.id} L${r.level} ${r.title}`).join('\n');
+
+    const systemPrompt = `文档内容重组助手。将旧内容分配到新大纲。\n\n旧内容：\n${oldContent}\n\n新大纲：\n${newOutline}\n\n规则：
+1. 旧内容匹配新小节：action:"update", id:新ID, content:润色后内容
+2. 无法匹配：跳过
+3. 保留HTML和图片<img>/视频<video>标签
+4. 只返回JSON：[{"action":"update","id":1,"content":"<p>内容</p>"}]`;
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 90000);
+
+    const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+      signal: controller.signal,
+      body: JSON.stringify({
+        model: 'deepseek-chat',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: '请开始重组内容' }
+        ],
+        temperature: 0.7
+      })
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      aiTasks[taskId] = { status: 'failed', error: 'AI 请求失败' };
+      return;
+    }
+
+    const data = await response.json();
+    let text = data.choices[0].message.content.trim();
+    if (text.startsWith('```json')) text = text.substring(7, text.length - 3).trim();
+    else if (text.startsWith('```')) text = text.substring(3, text.length - 3).trim();
+
+    const updates = JSON.parse(text);
+
+    await new Promise((resolve, reject) => {
+      const updateStmt = db.prepare('UPDATE materials SET content = ? WHERE id = ? AND department = ?');
+      db.serialize(() => {
+        db.run('BEGIN TRANSACTION');
+        for (const up of updates) {
+          if (up.action === 'update' && up.id && up.content) updateStmt.run(up.content, up.id, targetDept);
+        }
+        db.run('COMMIT', () => {
+          updateStmt.finalize();
+          resolve();
+        });
+      });
+    });
+
+    aiTasks[taskId] = { status: 'completed', message: 'AI 内容迁移完成' };
+  } catch (err) {
+    console.error('AI 迁移失败:', err.message);
+    aiTasks[taskId] = { status: 'failed', error: err.message.substring(0, 200) };
+  }
+}
+
+// AI Generate content & Save to MD (async)
 app.post('/admin/generate-ai-content', isAuthenticated, async (req, res) => {
   const { newMaterials } = req.body;
   const dept = req.session.department;
 
-  // 1. Check content size (e.g., limit to 50k characters for stability)
   if (newMaterials && newMaterials.length > 50000) {
     return res.status(400).json({ error: '上传内容过大（限5万字以内），请分次处理以确保生成质量。' });
   }
 
+  const taskId = Date.now().toString() + '-' + Math.random().toString(36).substring(2, 7);
+  aiTasks[taskId] = { status: 'processing', progress: '正在调用 AI...' };
+
   db.get('SELECT value FROM settings WHERE key = ?', ['deepseek_api_key'], async (err, row) => {
     const apiKey = row ? row.value : null;
-    if (!apiKey) return res.status(400).json({ error: '请先在系统设置中配置 API Key' });
+    if (!apiKey) {
+      aiTasks[taskId] = { status: 'failed', error: '请先在系统设置中配置 API Key' };
+      return;
+    }
 
+    // 只获取标题和层级，减少上下文
     db.all('SELECT id, title, level, parent_id, content FROM materials WHERE department = ? ORDER BY id ASC', [dept], async (err, rows) => {
-      if (err || rows.length === 0) return res.status(400).json({ error: '当前部门大纲为空，请先初始化大纲。' });
-
-      // Pass full content for fusion and deduplication
-      const outlineContext = rows.map(r => `ID: ${r.id} | 层级: ${r.level} | 标题: ${r.title} | 现有完整内容: ${r.content || '空'}`).join('\n\n');
-
-      let systemPrompt = `你是一个智能文档助手。负责接收用户的新资料，并更新到现有的文档结构中。\n\n当前大纲结构及各自的【现有完整内容】如下：\n${outlineContext}\n\n`;
-      systemPrompt += `规则：\n`;
-      systemPrompt += `1. 更新/融合（防止冗余，最高优先级）：如果新资料所讲的知识点在某个现有小节中已经存在相关描述，请你将新资料与该小节的【现有完整内容】进行深度融合、去重和优化，重新撰写出一份结构更清晰、覆盖全面的正文。使用 action: "overwrite" 覆盖该小节。\n`;
-      systemPrompt += `2. 追加：仅当新资料属于某小节，且与该小节现有内容是完全独立的不同事项（例如新增的一个无关案例）时，才使用 action: "append" 追加在末尾。\n`;
-      systemPrompt += `3. 新建：如果讲述的是完全全新的知识点/大坑，现有大纲中没有合适的小节，选择 action: "create"，指定所属大章节的 parent_id 和新小节的 title。\n`;
-      systemPrompt += `4. 极其重要：用户的富文本资料中若包含图片（<img src="...">）或视频（<video src="...">）标签，你必须在你生成的内容中原封不动地保留这些标签，将它们插入到合适的位置！绝不能丢失图片或视频链接！\n`;
-
-      if (dept === 'engineering') {
-        systemPrompt += `5. 【工程部专属 - 大章节说明】：请为本次涉及更新的所有大章节（层级为1），生成或补充一段引导性的说明文字（优先尝试 overwrite 融合更新，如果没有旧内容则 append）。\n`;
-        systemPrompt += `6. 【工程部专属 - 核心总结】：大纲最后通常有一个“核心总结”节点（比如六、核心总结）。每次处理新资料时，请务必结合本次的新增内容以及整个大纲目前的全面情况，重新撰写并覆盖该总结章节的内容（使用 action: "overwrite" 并指定该总结节点的id）。\n`;
+      if (err || rows.length === 0) {
+        aiTasks[taskId] = { status: 'failed', error: '当前部门大纲为空，请先初始化大纲。' };
+        return;
       }
 
-      systemPrompt += `\n请严格返回合法JSON数组。示例格式：\n[\n  {"action": "overwrite", "id": 1, "content": "<p>融合去重后的全量新内容</p>"},\n  {"action": "create", "parent_id": 1, "title": "2. 新坑点", "content": "<p>新正文</p>"}\n]\n只输出JSON！`;
+      // 精简上下文：只发送标题+内容摘要
+      const outlineContext = rows.map(r => {
+        const contentLen = r.content ? r.content.length : 0;
+        const summary = r.content ? r.content.substring(0, 100).replace(/<[^>]*>/g, '') : '空';
+        return `ID:${r.id} L${r.level} ${r.title} [内容长度:${contentLen}字, 摘要:${summary}${contentLen > 100 ? '...' : ''}]`;
+      }).join('\n');
 
-      // 2. Setup Timeout Controller
+      let systemPrompt = `智能文档助手，将新资料归类到文档结构。\n大纲：\n${outlineContext}\n\n规则：
+1. 知识点已存在匹配小节：action:"overwrite" 覆盖该小节，融合去重优化
+2. 与某大章节有关联但无匹配小节：action:"create" 指定 parent_id(所属大章节ID) 和 title(你自动生成的二级标题)，并写入内容
+3. 完全独立新事项但属于文档范畴：action:"append" 追加到最相近小节
+4. 与本文档完全无关：action:"reject" 说明原因
+5. 必须保留原有的<img>和<video>标签！
+
+返回JSON数组：
+[{"action":"overwrite","id":1,"content":"<p>内容</p>"}]
+[{"action":"create","parent_id":3,"title":"新二级标题","content":"<p>内容</p>"}]
+[{"action":"reject","reason":"与本文档无关的原因"}]
+只输出JSON！`;
+
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 seconds timeout
+      const timeoutId = setTimeout(() => controller.abort(), 90000);
 
       try {
+        aiTasks[taskId].progress = 'AI 正在处理中...';
         const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
@@ -405,93 +519,96 @@ app.post('/admin/generate-ai-content', isAuthenticated, async (req, res) => {
 
         clearTimeout(timeoutId);
 
-        if (!response.ok) {
-          const errorMsg = await response.text();
-          throw new Error("AI API Error: " + errorMsg);
-        }
+        if (!response.ok) throw new Error("AI API Error: " + await response.text());
 
         const data = await response.json();
+        aiTasks[taskId].progress = 'AI 处理完成，正在保存...';
+
         let text = data.choices[0].message.content.trim();
-        if (text.startsWith('\`\`\`json')) text = text.substring(7, text.length - 3).trim();
-        else if (text.startsWith('\`\`\`')) text = text.substring(3, text.length - 3).trim();
+        if (text.startsWith('```json')) text = text.substring(7, text.length - 3).trim();
+        else if (text.startsWith('```')) text = text.substring(3, text.length - 3).trim();
 
         const updates = JSON.parse(text);
 
-        // Save generated content to a Markdown file
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
         const mdFileName = `doc_${dept}_${timestamp}.md`;
-        let mdContent = `# 新增内容归档 - ${new Date().toLocaleString()}\n\n`;
-        mdContent += `## 原始输入 (HTML富文本):\n${newMaterials}\n\n`;
-        mdContent += `---\n\n## AI 生成归类结果:\n\n`;
+        let mdContent = `# 新增内容归档 - ${new Date().toLocaleString()}\n\n## 原始输入:\n${newMaterials}\n\n---\n\n## 归类结果:\n\n`;
+
+        const rejectedItems = updates.filter(u => u.action === 'reject');
+        const validUpdates = updates.filter(u => u.action !== 'reject');
+
         for (const up of updates) {
-          if (up.action === 'append') {
-            const matchTitle = rows.find(r => r.id == up.id)?.title || '未知小节';
-            mdContent += `### [追加] ${matchTitle} (ID: ${up.id})\n${up.content}\n\n`;
-          } else if (up.action === 'create') {
-            const parentTitle = rows.find(r => r.id == up.parent_id)?.title || '未知大章';
-            mdContent += `### [新建小节] ${up.title} (隶属于: ${parentTitle})\n${up.content}\n\n`;
-          } else if (up.action === 'overwrite') {
-            const matchTitle = rows.find(r => r.id == up.id)?.title || '未知小节';
-            mdContent += `### [覆盖重写] ${matchTitle} (ID: ${up.id})\n${up.content}\n\n`;
+          if (up.action === 'reject') {
+            mdContent += `### [无关] 已跳过：${up.reason}\n\n`;
+          } else {
+            const t = rows.find(r => r.id == up.id)?.title || rows.find(r => r.id == up.parent_id)?.title || '未知';
+            mdContent += `### [${up.action || 'update'}] ${t} (ID:${up.id || up.parent_id})\n${up.content || up.title}\n\n`;
           }
         }
         fs.writeFileSync(path.join(__dirname, 'public/docs', mdFileName), mdContent);
 
-        // Record the AI generated archive in user_uploads table
         db.run('INSERT INTO user_uploads (filename, original_name, file_path, file_type, department, username) VALUES (?, ?, ?, ?, ?, ?)',
           [mdFileName, `AI提交归档_${timestamp}.md`, '/docs/' + mdFileName, 'ai_archive', dept, req.session.username]);
 
-        // Update DB
         const updateStmt = db.prepare('UPDATE materials SET content = CASE WHEN content IS NULL OR content = "" THEN ? ELSE content || "<br><br>" || ? END WHERE id = ? AND department = ?');
         const overwriteStmt = db.prepare('UPDATE materials SET content = ? WHERE id = ? AND department = ?');
         const createStmt = db.prepare('INSERT INTO materials (title, content, department, level, parent_id) VALUES (?, ?, ?, 2, ?)');
 
         db.serialize(() => {
           db.run('BEGIN TRANSACTION');
-          for (const up of updates) {
-            if (up.action === 'append' && up.id && up.content) {
-              updateStmt.run(up.content, up.content, up.id, dept);
-            } else if (up.action === 'overwrite' && up.id && up.content) {
-              overwriteStmt.run(up.content, up.id, dept);
-            } else if (up.action === 'create' && up.parent_id && up.title && up.content) {
-              createStmt.run(up.title, up.content, dept, up.parent_id);
-            } else if (up.id && up.content && !up.action) {
-              updateStmt.run(up.content, up.content, up.id, dept);
-            }
+          for (const up of validUpdates) {
+            if (up.action === 'append' && up.id && up.content) updateStmt.run(up.content, up.content, up.id, dept);
+            else if (up.action === 'overwrite' && up.id && up.content) overwriteStmt.run(up.content, up.id, dept);
+            else if (up.action === 'create' && up.parent_id && up.title && up.content) createStmt.run(up.title, up.content, dept, up.parent_id);
+            else if (up.id && up.content && !up.action) updateStmt.run(up.content, up.content, up.id, dept);
           }
           db.run('COMMIT', () => {
-            updateStmt.finalize();
-            overwriteStmt.finalize();
-            createStmt.finalize();
+            updateStmt.finalize(); overwriteStmt.finalize(); createStmt.finalize();
 
-            // Record full snapshot for Version Control
             db.all('SELECT * FROM materials WHERE department = ? ORDER BY id ASC', [dept], (err, currentRows) => {
               if (!err && currentRows) {
-                const snapshot = JSON.stringify(currentRows);
-                const tsName = new Date().toLocaleString();
-                db.run('INSERT INTO document_versions (department, timestamp, snapshot) VALUES (?, ?, ?)', [dept, tsName, snapshot]);
+                db.run('INSERT INTO document_versions (department, timestamp, snapshot) VALUES (?, ?, ?)',
+                  [dept, new Date().toLocaleString(), JSON.stringify(currentRows)]);
               }
             });
 
+            const rejectMsg = rejectedItems.length > 0 ? `\n⚠️ 以下 ${rejectedItems.length} 项被跳过：${rejectedItems.map(r => r.reason).join('；')}` : '';
+
             db.run("INSERT INTO activity_logs (username, department, action, details) VALUES (?, ?, ?, ?)",
-              [req.session.username, dept, 'AI智能填充', `成功处理新资料，归档: ${mdFileName}`]);
+              [req.session.username, dept, 'AI智能填充', `成功处理新资料，归档: ${mdFileName}${rejectMsg}`]);
             
-            res.json({ success: true, message: 'AI 处理并归档成功' });
+            aiTasks[taskId] = { 
+              status: 'completed', 
+              message: `AI 处理并归档成功${rejectedItems.length > 0 ? '（部分内容与文档无关，已跳过）' : ''}`, 
+              mdFile: mdFileName,
+              rejected: rejectedItems.length > 0 ? rejectedItems.map(r => r.reason) : []
+            };
           });
         });
       } catch (err) {
         clearTimeout(timeoutId);
         console.error("AI Generation Error:", err);
-        
-        const errorDetail = err.name === 'AbortError' ? 'AI 请求超时（60秒），可能是内容过多或网络拥堵，请尝试分段处理。' : err.message;
-        
+        const errorDetail = err.name === 'AbortError' ? 'AI 请求超时（90秒），请尝试分段处理。' : err.message;
         db.run("INSERT INTO activity_logs (username, department, action, details) VALUES (?, ?, ?, ?)",
           [req.session.username, dept, 'AI处理失败', `错误: ${errorDetail.substring(0, 200)}`]);
-          
-        res.status(500).json({ error: errorDetail });
+        aiTasks[taskId] = { status: 'failed', error: errorDetail };
       }
     });
   });
+
+  // 立即返回 taskId
+  res.json({ success: true, taskId: taskId, message: 'AI 处理已启动，请稍候...' });
+});
+
+// 查询 AI 任务状态
+app.get('/admin/ai-task-status/:taskId', isAuthenticated, (req, res) => {
+  const task = aiTasks[req.params.taskId];
+  if (!task) return res.json({ status: 'not_found' });
+  res.json(task);
+  // 完成后清理
+  if (task.status === 'completed' || task.status === 'failed') {
+    setTimeout(() => delete aiTasks[req.params.taskId], 60000);
+  }
 });
 
 // Upload media for WangEditor

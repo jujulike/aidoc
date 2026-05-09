@@ -210,11 +210,9 @@
           <input type="hidden" name="newMaterials" id="newMaterials">
 
           <div style="margin-top: 15px;">
-            <button type="submit" class="btn" style="background: #8e44ad;" onclick="this.innerText='AI 思考并归档中...';">让 AI
+            <button type="submit" class="btn" style="background: #8e44ad;" id="ai-submit-btn">让 AI
               智能分配内容并保存快照</button>
-            <!--预览生成的文档-->
-            <!-- <button class="btn" style="background: #2ecc71;" onclick="viewGeneratedDocument()"> -->
-            <!-- 预览按钮 -->
+            <span id="ai-progress" style="margin-left: 10px; font-size: 13px; color: #8e44ad; display: none;"></span>
           </div>
         </form>
       </div>
@@ -386,33 +384,67 @@
             return;
           }
           
-          const btn = this.querySelector('button[type="submit"]');
-          const originalText = btn.innerText;
+          const btn = document.getElementById('ai-submit-btn');
+          const progress = document.getElementById('ai-progress');
           btn.disabled = true;
-          btn.innerText = 'AI 正在分析并归类 (预计15-60秒)...';
+          progress.style.display = 'inline';
+          progress.innerText = '⏳ AI 正在分析并归类内容...';
           
           const formData = new FormData(this);
           formData.set('newMaterials', editor.getHtml());
           
           try {
-            const res = await fetch('/admin/generate-ai-content', {
+            // 启动任务
+            const startRes = await fetch('/admin/generate-ai-content', {
               method: 'POST',
               headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
               body: new URLSearchParams(formData).toString()
             });
             
-            const result = await res.json();
-            if (res.ok) {
-              alert(result.message || '处理成功');
-              window.location.reload();
-            } else {
-              alert('处理失败: ' + (result.error || '未知错误'));
+            const startResult = await startRes.json();
+            if (!startRes.ok || !startResult.taskId) {
+              throw new Error(startResult.error || '任务启动失败');
             }
+
+            const taskId = startResult.taskId;
+            progress.innerText = '⏳ ' + (startResult.message || 'AI 处理中...');
+
+            // 轮询状态
+            const pollInterval = setInterval(async () => {
+              const statusRes = await fetch(`/admin/ai-task-status/${taskId}`);
+              const statusData = await statusRes.json();
+              
+              if (statusData.status === 'not_found') {
+                clearInterval(pollInterval);
+                alert('任务状态未知，请稍后刷新页面检查');
+                btn.disabled = false;
+                progress.style.display = 'none';
+              } else if (statusData.status === 'completed') {
+                clearInterval(pollInterval);
+                progress.innerText = '✅ ' + (statusData.message || '完成');
+                btn.disabled = false;
+                
+                if (statusData.rejected && statusData.rejected.length > 0) {
+                  setTimeout(() => {
+                    alert('⚠️ 添加内容与本文档无关，请检查或修改内容。\n\n跳过原因：\n' + statusData.rejected.map(r => '• ' + r).join('\n'));
+                    window.location.reload();
+                  }, 800);
+                } else {
+                  setTimeout(() => window.location.reload(), 800);
+                }
+              } else if (statusData.status === 'failed') {
+                clearInterval(pollInterval);
+                progress.style.color = '#e74c3c';
+                progress.innerText = '❌ ' + statusData.error;
+                btn.disabled = false;
+              } else {
+                progress.innerText = '⏳ ' + (statusData.progress || 'AI 处理中...');
+              }
+            }, 2000);
           } catch (err) {
             alert('发生网络错误或超时: ' + err.message);
-          } finally {
             btn.disabled = false;
-            btn.innerText = originalText;
+            progress.style.display = 'none';
           }
         };
 
